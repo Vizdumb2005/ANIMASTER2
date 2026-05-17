@@ -65,7 +65,13 @@ export default function CanvasView() {
       disposed = true;
       stopLoop();
       unsubscribe();
-      app.destroy(true);
+      try {
+        if (app.renderer) {
+          app.destroy(true);
+        }
+      } catch {
+        // PixiJS may throw if app was not fully initialized
+      }
     };
   }, []);
 
