@@ -56,6 +56,15 @@ export default function CanvasView() {
         sceneStore.mutateScene((scene) => {
           scene.actors = scene.actors.map((actor) => evaluateActor(actor, deltaMs, scene));
         });
+        clearAndRedrawScene({
+          backgroundLayer,
+          actorLayer,
+          uiLayer,
+          scene: sceneStore.getScene(),
+          width: app.renderer.width,
+          height: app.renderer.height,
+          deltaMs
+        });
       });
     };
 
