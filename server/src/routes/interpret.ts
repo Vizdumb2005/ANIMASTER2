@@ -14,9 +14,9 @@ type SceneGraphResponse = {
     type: 'humanoid';
     position: { x: number; y: number };
     targetPosition: { x: number; y: number } | null;
-    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous';
-    currentAction: 'idle' | 'walking' | 'sitting';
-    actionQueue: Array<'idle' | 'walking' | 'sitting'>;
+    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous' | 'excited' | 'awkward' | 'angry' | 'exhausted';
+    currentAction: 'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing';
+    actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'>;
     joints: {
       head: { x: number; y: number };
       torso: { x: number; y: number };
@@ -35,8 +35,37 @@ type SceneGraphResponse = {
     width: number;
     height: number;
   };
-  camera: { x: number; y: number; zoom: number; mode: 'static' | 'follow' };
+  camera: { x: number; y: number; zoom: number; mode: string };
   sessionHistory: Array<{ id: string; prompt: string; createdAt: number }>;
+  cinematicGrammar: {
+    tone: string;
+    template: {
+      cameraMode: string;
+      spacingMultiplier: number;
+      motionEnergyScale: number;
+      pauseFrequency: number;
+      contrastBoost: number;
+      headroom: number;
+    };
+  };
+  atmosphere: {
+    effects: string[];
+    lightingTint: string;
+    ambientIntensity: number;
+  };
+  relationships: Array<{
+    actorAId: string;
+    actorBId: string;
+    type: string;
+    awarenessRadius: number;
+    gazeTarget: string | null;
+    emotionalReaction: string | null;
+  }>;
+  rhythm: {
+    tempo: string;
+    pauseFrequencyPerMinute: number;
+    motionEnergyCurve: string;
+  };
 };
 
 const router = Router();
@@ -137,43 +166,100 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const isSad = /sad|dark|lonely/i.test(prompt);
   const isNervous = /nervous|anxious|tense/i.test(prompt);
   const isHappy = /happy|warm|bright/i.test(prompt);
+  const isExcited = /excited|thrilled/i.test(prompt);
+  const isAngry = /angry|furious|rage/i.test(prompt);
+  const isExhausted = /exhausted|tired|weary/i.test(prompt);
+  const isAwkward = /awkward|uncomfortable/i.test(prompt);
   const isSit = /sit/i.test(prompt);
-  const isWalk = /walk|enter/i.test(prompt) || !isSit;
+  const isWalk = /walk|enter/i.test(prompt);
+  const isApproach = /approach|comes|walks.*toward|comes.*closer/i.test(prompt);
+  const hasSecondActor = /another|second|someone|while.*character|two/i.test(prompt);
+  const isStreet = /street|outside|outdoor|lamp|light/i.test(prompt);
+  const isNight = /night|dark|flicker|streetlight/i.test(prompt);
+  const isLonely = /lonely|alone|isolated/i.test(prompt);
+  const hasFlicker = /flicker|streetlight|lamp/i.test(prompt);
+  const hasRain = /rain/i.test(prompt);
 
-  const emotionState = isNervous ? 'nervous' : isHappy ? 'happy' : isSad ? 'sad' : 'neutral';
+  const emotionState = isAngry ? 'angry' : isExhausted ? 'exhausted' : isExcited ? 'excited' : isAwkward ? 'awkward' : isNervous ? 'nervous' : isHappy ? 'happy' : isSad ? 'sad' : 'neutral';
   const currentAction = isWalk ? 'walking' : isSit ? 'sitting' : 'idle';
-  const actionQueue = isWalk && isSit ? ['sitting'] as const : ['idle'] as const;
-  const roomColor = isSad ? '#17151f' : isHappy ? '#2d1d12' : '#1b1f24';
+  const actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'> = isWalk && isSit ? ['sitting'] : ['idle'];
+
+  const envType = isStreet ? 'outdoor_street' : 'indoor_room';
+  const roomColor = isNight ? '#0a0e1a' : isSad ? '#17151f' : isHappy ? '#2d1d12' : '#1b1f24';
+
+  const tone = isLonely ? 'lonely' : isSad ? 'sad' : isNervous ? 'tense' : 'neutral';
+  const cameraMode = isLonely ? 'wide_shot' : isSad ? 'wide_shot' : isNervous && hasSecondActor ? 'tension' : 'static';
+
+  const effects: string[] = [];
+  if (hasFlicker) effects.push('flicker');
+  if (hasRain) effects.push('rain');
+  if (effects.length === 0) effects.push('none');
+
+  const actors: SceneGraphResponse['actors'] = [
+    {
+      id: 'actor_stickman',
+      label: 'Stickman',
+      type: 'humanoid',
+      position: { x: 400, y: 360 },
+      targetPosition: isWalk ? { x: 660, y: 360 } : null,
+      emotionState,
+      currentAction,
+      actionQueue: [...actionQueue],
+      joints: {
+        head: { x: 400, y: 302 },
+        torso: { x: 400, y: 330 },
+        leftArm: { x: 372, y: 350 },
+        rightArm: { x: 428, y: 350 },
+        leftLeg: { x: 382, y: 402 },
+        rightLeg: { x: 418, y: 402 }
+      },
+      actionElapsed: 0
+    }
+  ];
+
+  const relationships: SceneGraphResponse['relationships'] = [];
+
+  if (hasSecondActor) {
+    const secondAction = isApproach ? 'approaching' : 'idle';
+    const secondPos = { x: 850, y: 360 };
+    actors.push({
+      id: 'actor_2',
+      label: 'Stranger',
+      type: 'humanoid',
+      position: secondPos,
+      targetPosition: isApproach ? { x: 500, y: 360 } : null,
+      emotionState: 'neutral',
+      currentAction: secondAction,
+      actionQueue: ['idle'],
+      joints: {
+        head: { x: secondPos.x, y: secondPos.y - 58 },
+        torso: { x: secondPos.x, y: secondPos.y - 30 },
+        leftArm: { x: secondPos.x - 28, y: secondPos.y - 10 },
+        rightArm: { x: secondPos.x + 28, y: secondPos.y - 10 },
+        leftLeg: { x: secondPos.x - 18, y: secondPos.y + 42 },
+        rightLeg: { x: secondPos.x + 18, y: secondPos.y + 42 }
+      },
+      actionElapsed: 0
+    });
+    relationships.push({
+      actorAId: 'actor_stickman',
+      actorBId: 'actor_2',
+      type: isApproach ? 'approaching' : 'stranger',
+      awarenessRadius: 200,
+      gazeTarget: 'actor_2',
+      emotionalReaction: null
+    });
+  }
 
   return {
     id: 'scene_001',
     version: 1,
-    actors: [
-      {
-        id: 'actor_stickman',
-        label: 'Stickman',
-        type: 'humanoid',
-        position: { x: 400, y: 360 },
-        targetPosition: { x: 660, y: 360 },
-        emotionState,
-        currentAction,
-        actionQueue: [...actionQueue],
-        joints: {
-          head: { x: 400, y: 302 },
-          torso: { x: 400, y: 330 },
-          leftArm: { x: 372, y: 350 },
-          rightArm: { x: 428, y: 350 },
-          leftLeg: { x: 382, y: 402 },
-          rightLeg: { x: 418, y: 402 }
-        },
-        actionElapsed: 0
-      }
-    ],
+    actors,
     environment: {
-      type: 'indoor_room',
+      type: envType,
       backgroundColor: roomColor,
-      floorColor: isSad ? '#2d221f' : '#3a2b1f',
-      wallColor: isSad ? '#211c29' : '#2a2228',
+      floorColor: isNight ? '#0d0f14' : isSad ? '#2d221f' : '#3a2b1f',
+      wallColor: isNight ? '#111828' : isSad ? '#211c29' : '#2a2228',
       width: 960,
       height: 540
     },
@@ -181,7 +267,7 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
       x: 0,
       y: 0,
       zoom: 1,
-      mode: 'static'
+      mode: cameraMode
     },
     sessionHistory: [
       {
@@ -189,7 +275,29 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
         prompt,
         createdAt: Date.now()
       }
-    ]
+    ],
+    cinematicGrammar: {
+      tone,
+      template: {
+        cameraMode,
+        spacingMultiplier: isLonely ? 1.8 : isSad ? 1.4 : 1.0,
+        motionEnergyScale: isLonely ? 0.6 : isSad ? 0.5 : 1.0,
+        pauseFrequency: isLonely ? 8 : isSad ? 10 : 4,
+        contrastBoost: isNervous ? 0.5 : 0.0,
+        headroom: isLonely ? 1.4 : 1.0
+      }
+    },
+    atmosphere: {
+      effects,
+      lightingTint: isNight ? 'night' : isSad ? 'cold' : 'rgba(0,0,0,0)',
+      ambientIntensity: isNight ? 0.4 : 1.0
+    },
+    relationships,
+    rhythm: {
+      tempo: isLonely || isSad ? 'slow' : isExcited ? 'fast' : 'medium',
+      pauseFrequencyPerMinute: isLonely ? 8 : isSad ? 10 : 4,
+      motionEnergyCurve: isNervous ? 'sharp' : 'linear'
+    }
   };
 }
 
@@ -202,7 +310,11 @@ function normalizeSceneGraph(scene: SceneGraphResponse, prompt: string): SceneGr
     actors: Array.isArray(scene.actors) && scene.actors.length > 0 ? scene.actors : fallback.actors,
     environment: scene.environment ?? fallback.environment,
     camera: scene.camera ?? fallback.camera,
-    sessionHistory: Array.isArray(scene.sessionHistory) ? scene.sessionHistory : fallback.sessionHistory
+    sessionHistory: Array.isArray(scene.sessionHistory) ? scene.sessionHistory : fallback.sessionHistory,
+    cinematicGrammar: scene.cinematicGrammar ?? fallback.cinematicGrammar,
+    atmosphere: scene.atmosphere ?? fallback.atmosphere,
+    relationships: Array.isArray(scene.relationships) ? scene.relationships : fallback.relationships,
+    rhythm: scene.rhythm ?? fallback.rhythm
   };
 }
 

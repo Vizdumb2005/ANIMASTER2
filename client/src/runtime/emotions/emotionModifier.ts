@@ -1,6 +1,11 @@
 import { Actor } from '@animaster/shared/scene';
+import { applyNervousModifier } from './nervous';
+import { applyExcitedModifier } from './excited';
+import { applyAwkwardModifier } from './awkward';
+import { applyAngryModifier } from './angry';
+import { applyExhaustedModifier } from './exhausted';
 
-export function applyEmotionModifier(actor: Actor): Actor {
+export function applyEmotionModifier(actor: Actor, deltaMs: number = 0): Actor {
   switch (actor.emotionState) {
     case 'sad':
       actor.joints.head.y += 5;
@@ -11,13 +16,7 @@ export function applyEmotionModifier(actor: Actor): Actor {
       actor.joints.rightLeg.y += 2;
       break;
     case 'nervous':
-      actor.joints.head.y -= 2;
-      actor.joints.torso.y -= 1;
-      actor.joints.leftArm.x -= 4;
-      actor.joints.rightArm.x += 4;
-      actor.joints.leftArm.y -= 3;
-      actor.joints.rightArm.y -= 3;
-      break;
+      return applyNervousModifier(actor, deltaMs);
     case 'happy':
       actor.joints.head.y -= 3;
       actor.joints.torso.y -= 2;
@@ -26,6 +25,14 @@ export function applyEmotionModifier(actor: Actor): Actor {
       actor.joints.leftLeg.y -= 1;
       actor.joints.rightLeg.y -= 1;
       break;
+    case 'excited':
+      return applyExcitedModifier(actor, deltaMs);
+    case 'awkward':
+      return applyAwkwardModifier(actor);
+    case 'angry':
+      return applyAngryModifier(actor, deltaMs);
+    case 'exhausted':
+      return applyExhaustedModifier(actor, deltaMs);
     default:
       break;
   }

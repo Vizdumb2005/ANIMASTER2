@@ -1,7 +1,7 @@
 export const sceneMutationResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['actors', 'environment', 'camera'],
+  required: ['actors', 'environment', 'camera', 'cinematicGrammar', 'atmosphere', 'relationships', 'rhythm'],
   properties: {
     actors: {
       type: 'array',
@@ -36,11 +36,11 @@ export const sceneMutationResponseSchema = {
               { type: 'null' }
             ]
           },
-          emotionState: { enum: ['neutral', 'sad', 'happy', 'nervous'] },
-          currentAction: { enum: ['idle', 'walking', 'sitting'] },
+          emotionState: { enum: ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'] },
+          currentAction: { enum: ['idle', 'walking', 'sitting', 'approaching', 'pacing'] },
           actionQueue: {
             type: 'array',
-            items: { enum: ['idle', 'walking', 'sitting'] }
+            items: { enum: ['idle', 'walking', 'sitting', 'approaching', 'pacing'] }
           },
           joints: {
             type: 'object',
@@ -80,7 +80,64 @@ export const sceneMutationResponseSchema = {
         x: { type: 'number' },
         y: { type: 'number' },
         zoom: { type: 'number' },
-        mode: { enum: ['static', 'follow'] }
+        mode: { enum: ['static', 'follow', 'close_up', 'wide_shot', 'over_the_shoulder', 'dramatic_zoom', 'tension'] }
+      }
+    },
+    cinematicGrammar: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['tone', 'template'],
+      properties: {
+        tone: { enum: ['neutral', 'sad', 'tense', 'lonely', 'awkward', 'energetic', 'romantic', 'threatening'] },
+        template: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['cameraMode', 'spacingMultiplier', 'motionEnergyScale', 'pauseFrequency', 'contrastBoost', 'headroom'],
+          properties: {
+            cameraMode: { enum: ['static', 'follow', 'close_up', 'wide_shot', 'over_the_shoulder', 'dramatic_zoom', 'tension'] },
+            spacingMultiplier: { type: 'number' },
+            motionEnergyScale: { type: 'number' },
+            pauseFrequency: { type: 'number' },
+            contrastBoost: { type: 'number' },
+            headroom: { type: 'number' }
+          }
+        }
+      }
+    },
+    atmosphere: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['effects', 'lightingTint', 'ambientIntensity'],
+      properties: {
+        effects: { type: 'array', items: { enum: ['rain', 'fog', 'flicker', 'dust', 'none'] } },
+        lightingTint: { type: 'string' },
+        ambientIntensity: { type: 'number' }
+      }
+    },
+    relationships: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['actorAId', 'actorBId', 'type', 'awarenessRadius', 'gazeTarget', 'emotionalReaction'],
+        properties: {
+          actorAId: { type: 'string' },
+          actorBId: { type: 'string' },
+          type: { enum: ['stranger', 'approaching', 'confronting', 'avoiding', 'conversing'] },
+          awarenessRadius: { type: 'number' },
+          gazeTarget: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          emotionalReaction: { anyOf: [{ type: 'string' }, { type: 'null' }] }
+        }
+      }
+    },
+    rhythm: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['tempo', 'pauseFrequencyPerMinute', 'motionEnergyCurve'],
+      properties: {
+        tempo: { enum: ['slow', 'medium', 'fast'] },
+        pauseFrequencyPerMinute: { type: 'number' },
+        motionEnergyCurve: { enum: ['linear', 'ease-in', 'ease-out', 'sharp'] }
       }
     }
   },
@@ -105,14 +162,39 @@ Return a COMPLETE scene patch that reflects the requested change.
 
 Rules:
 - Output JSON only. No markdown wrappers.
-- The response must contain actors, environment, and camera fields.
+- The response must contain actors, environment, camera, cinematicGrammar, atmosphere, relationships, and rhythm fields.
 - Preserve ALL existing actors, their positions, actions, and states unless the edit explicitly changes them.
 - When the user says "make the room darker" or similar lighting edits, darken the environment colors but keep all actors unchanged.
-- When the user says "make him nervous" or similar emotion edits, change only the referenced actor's emotionState.
+- When the user says "make him nervous" or similar emotion edits, change only the referenced actor's emotionState. Valid emotions: neutral, sad, happy, nervous, excited, awkward, angry, exhausted.
 - When the user says "add another character", append a new actor to the actors array while preserving all existing actors.
-- When adding a new actor, give it a unique id (e.g. "actor_2"), a descriptive label, and place it at a different position from existing actors.
-- New actors should default to idle action with empty actionQueue unless the prompt specifies otherwise.
+- Valid actions: idle, walking, sitting, approaching, pacing.
 - Keep joints consistent with actor position. Head is ~58px above position.y, torso ~30px above, arms ~28px to each side and ~10px above, legs ~18px to each side and ~42px below.
+
+## Tonal Edits (Phase 2)
+- When the user says "make the scene feel more lonely/tense/sad/etc.", update the cinematicGrammar.tone and template accordingly.
+- Lonely: wide_shot camera, high spacing, low energy, cold lighting.
+- Tense: close_up or tension camera, low spacing, high energy, high contrast.
+- Sad: wide_shot camera, high spacing, low energy, cool lighting tint.
+
+## Camera Edits
+- Camera modes: static, follow, close_up, wide_shot, over_the_shoulder, dramatic_zoom, tension.
+- Match camera mode to scene tone when editing mood.
+
+## Atmosphere Edits
+- Effects: rain, fog, flicker, dust, none.
+- lightingTint: warm, cold, night, or rgba(0,0,0,0) for no tint.
+- When user says "add rain", add 'rain' to effects array.
+- When user says "colder lighting", set lightingTint to 'cold'.
+
+## Relationship Edits
+- When user says "have the character stop and hesitate", change their currentAction to 'idle' and update relationships.
+- Relationship types: stranger, approaching, confronting, avoiding, conversing.
+
+## Rhythm
+- tempo: slow, medium, fast.
+- motionEnergyCurve: linear, ease-in, ease-out, sharp.
+- Lonely/sad scenes should have slow tempo and high pauseFrequencyPerMinute.
+
 - Do NOT regenerate the entire scene. Only change what the edit instruction asks for.
 
 Schema:
@@ -121,16 +203,16 @@ ${JSON.stringify(sceneMutationResponseSchema, null, 2)}
 Examples:
 
 1. Edit: "Make the room darker."
-   → Darken backgroundColor, floorColor, wallColor. Keep all actors exactly as they are.
+   → Darken backgroundColor, floorColor, wallColor. Keep all actors and other fields as they are.
 
-2. Edit: "Make him nervous."
-   → Change actors[0].emotionState to "nervous". Keep everything else unchanged.
+2. Edit: "Make the scene feel more lonely."
+   → Set cinematicGrammar.tone to 'lonely', template.cameraMode to 'wide_shot', increase spacingMultiplier, decrease motionEnergyScale, set atmosphere.lightingTint to 'cold', increase rhythm.pauseFrequencyPerMinute.
 
-3. Edit: "Add another character standing in the corner."
-   → Keep existing actors, append new actor with id "actor_2", position at far right (e.g. x:800), idle action.
+3. Edit: "Add rain and make the lighting colder."
+   → Add 'rain' to atmosphere.effects, set atmosphere.lightingTint to 'cold'. Keep actors unchanged.
 
-4. Edit: "Make the lighting warmer."
-   → Shift environment colors toward warm tones (#2d1d12 style). Keep actors unchanged.
+4. Edit: "Have the approaching character stop and hesitate."
+   → Change the approaching actor's currentAction to 'idle', update relationship type.
 `.trim();
 
 export function buildSceneMutationUserPrompt(prompt: string, currentScene: string) {

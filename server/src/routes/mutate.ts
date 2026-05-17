@@ -21,9 +21,9 @@ type ScenePatch = {
     type: 'humanoid';
     position: { x: number; y: number };
     targetPosition: { x: number; y: number } | null;
-    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous';
-    currentAction: 'idle' | 'walking' | 'sitting';
-    actionQueue: Array<'idle' | 'walking' | 'sitting'>;
+    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous' | 'excited' | 'awkward' | 'angry' | 'exhausted';
+    currentAction: 'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing';
+    actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'>;
     joints: {
       head: { x: number; y: number };
       torso: { x: number; y: number };
@@ -42,7 +42,36 @@ type ScenePatch = {
     width: number;
     height: number;
   };
-  camera: { x: number; y: number; zoom: number; mode: 'static' | 'follow' };
+  camera: { x: number; y: number; zoom: number; mode: string };
+  cinematicGrammar?: {
+    tone: string;
+    template: {
+      cameraMode: string;
+      spacingMultiplier: number;
+      motionEnergyScale: number;
+      pauseFrequency: number;
+      contrastBoost: number;
+      headroom: number;
+    };
+  };
+  atmosphere?: {
+    effects: string[];
+    lightingTint: string;
+    ambientIntensity: number;
+  };
+  relationships?: Array<{
+    actorAId: string;
+    actorBId: string;
+    type: string;
+    awarenessRadius: number;
+    gazeTarget: string | null;
+    emotionalReaction: string | null;
+  }>;
+  rhythm?: {
+    tempo: string;
+    pauseFrequencyPerMinute: number;
+    motionEnergyCurve: string;
+  };
 };
 
 const router = Router();
@@ -138,7 +167,14 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
       width: 960,
       height: 540
     },
-    camera: currentScene.camera ?? { x: 0, y: 0, zoom: 1, mode: 'static' as const }
+    camera: currentScene.camera ?? { x: 0, y: 0, zoom: 1, mode: 'static' },
+    cinematicGrammar: currentScene.cinematicGrammar ?? {
+      tone: 'neutral',
+      template: { cameraMode: 'static', spacingMultiplier: 1.0, motionEnergyScale: 1.0, pauseFrequency: 4, contrastBoost: 0.0, headroom: 1.0 }
+    },
+    atmosphere: currentScene.atmosphere ?? { effects: ['none'], lightingTint: 'rgba(0,0,0,0)', ambientIntensity: 1.0 },
+    relationships: currentScene.relationships ?? [],
+    rhythm: currentScene.rhythm ?? { tempo: 'medium', pauseFrequencyPerMinute: 4, motionEnergyCurve: 'linear' }
   };
 
   if (/darker|dim/i.test(prompt)) {
@@ -170,8 +206,55 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     scene.actors[0] = { ...scene.actors[0], emotionState: 'sad' };
   } else if (/happy|cheerful/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'happy' };
+  } else if (/excited|thrilled/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'excited' };
+  } else if (/angry|furious/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'angry' };
+  } else if (/exhausted|tired/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'exhausted' };
+  } else if (/awkward/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'awkward' };
   } else if (/neutral|calm/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'neutral' };
+  }
+
+  if (/lonely|more\s+lonely|lonelier/i.test(prompt)) {
+    scene.cinematicGrammar = {
+      tone: 'lonely',
+      template: { cameraMode: 'wide_shot', spacingMultiplier: 1.8, motionEnergyScale: 0.6, pauseFrequency: 8, contrastBoost: 0.2, headroom: 1.4 }
+    };
+    scene.camera = { ...scene.camera, mode: 'wide_shot' };
+    scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+    scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 8, motionEnergyCurve: 'ease-out' };
+  } else if (/tense|tenser|more\s+tense/i.test(prompt)) {
+    scene.cinematicGrammar = {
+      tone: 'tense',
+      template: { cameraMode: 'close_up', spacingMultiplier: 0.7, motionEnergyScale: 1.2, pauseFrequency: 2, contrastBoost: 0.5, headroom: 0.7 }
+    };
+    scene.camera = { ...scene.camera, mode: 'close_up' };
+    scene.rhythm = { tempo: 'medium', pauseFrequencyPerMinute: 2, motionEnergyCurve: 'sharp' };
+  }
+
+  if (/add\s+rain|rain/i.test(prompt)) {
+    const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
+    existingEffects.push('rain');
+    scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
+  }
+
+  if (/cold|colder/i.test(prompt) && /light/i.test(prompt)) {
+    scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+  }
+
+  if (/stop|hesitate/i.test(prompt) && scene.actors.length > 1) {
+    const approachingIdx = scene.actors.findIndex((a) => a.currentAction === 'approaching' || a.currentAction === 'walking');
+    if (approachingIdx >= 0) {
+      scene.actors[approachingIdx] = {
+        ...scene.actors[approachingIdx],
+        currentAction: 'idle',
+        targetPosition: null,
+        actionQueue: []
+      };
+    }
   }
 
   if (/add\s+(another|a\s+new|a\s+second)\s+(character|stickman|actor|person)/i.test(prompt)) {
