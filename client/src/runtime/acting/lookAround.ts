@@ -22,6 +22,12 @@ function getTimer(actorId: string, elapsed: number) {
   return timer;
 }
 
+export function clearLookAroundState(actorIds: Set<string>) {
+  for (const id of actorTimers.keys()) {
+    if (!actorIds.has(id)) actorTimers.delete(id);
+  }
+}
+
 export function applyLookAround(actor: Actor): Actor {
   const timer = getTimer(actor.id, actor.actionElapsed);
 

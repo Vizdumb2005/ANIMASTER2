@@ -4,11 +4,23 @@ import { evaluateStaging } from './staging/stagingEvaluator';
 import { evaluateReactions } from './acting/reactionTiming';
 import { autoSelectCameraMode } from './camera/cameraAutoSelect';
 import { captureSnapshot, validateContinuity } from './continuity/continuityTracker';
-import { getTempoMultiplier } from './rhythm/rhythmEvaluator';
+import { clearWeightShiftState } from './acting/weightShift';
+import { clearLookAroundState } from './acting/lookAround';
+import { clearHesitationState } from './acting/hesitation';
 
 let initialized = false;
+let lastActorIds = new Set<string>();
 
 export function evaluateScene(scene: SceneGraph): SceneGraph {
+  const currentIds = new Set(scene.actors.map((a) => a.id));
+
+  if (currentIds.size !== lastActorIds.size || [...currentIds].some((id) => !lastActorIds.has(id))) {
+    clearWeightShiftState(currentIds);
+    clearLookAroundState(currentIds);
+    clearHesitationState(currentIds);
+    lastActorIds = currentIds;
+  }
+
   if (!initialized && scene.actors.length > 0) {
     const stagedActors = evaluateStaging(scene);
     scene.actors = stagedActors;
@@ -39,4 +51,5 @@ export function evaluateScene(scene: SceneGraph): SceneGraph {
 
 export function resetSceneEvaluator() {
   initialized = false;
+  lastActorIds = new Set<string>();
 }

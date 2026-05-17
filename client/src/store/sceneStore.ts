@@ -1,5 +1,6 @@
 import { Actor, AtmosphereProfile, Camera, CinematicGrammar, Environment, SceneGraph, SceneRhythm, SessionEntry } from '@animaster/shared/scene';
 import { initActorJoints } from '../runtime/initActorJoints';
+import { resetSceneEvaluator } from '../runtime/sceneEvaluator';
 
 type SceneListener = (scene: SceneGraph) => void;
 
@@ -106,6 +107,7 @@ export const sceneStore = {
   },
 
   setScene(scene: SceneGraph) {
+    resetSceneEvaluator();
     currentScene = cloneScene(scene);
     for (const actor of currentScene.actors) {
       actor.joints = initActorJoints(actor.position);
