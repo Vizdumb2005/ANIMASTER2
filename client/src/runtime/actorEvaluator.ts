@@ -20,6 +20,6 @@ export function evaluateActor(actor: Actor, deltaMs: number, scene: SceneGraph):
       break;
   }
 
-  nextActor = applyEmotionModifier(nextActor);
+  nextActor = applyEmotionModifier(nextActor, deltaMs);
   return nextActor;
 }
