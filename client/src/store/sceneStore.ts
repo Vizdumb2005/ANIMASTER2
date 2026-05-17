@@ -1,4 +1,4 @@
-import { Actor, Camera, Environment, SceneGraph, SessionEntry } from '@animaster/shared/scene';
+import { Actor, AtmosphereProfile, Camera, CinematicGrammar, Environment, SceneGraph, SceneRhythm, SessionEntry } from '@animaster/shared/scene';
 import { initActorJoints } from '../runtime/initActorJoints';
 
 type SceneListener = (scene: SceneGraph) => void;
@@ -20,13 +20,41 @@ function createDefaultScene(): SceneGraph {
     mode: 'static'
   };
 
+  const cinematicGrammar: CinematicGrammar = {
+    tone: 'neutral',
+    template: {
+      cameraMode: 'static',
+      spacingMultiplier: 1.0,
+      motionEnergyScale: 1.0,
+      pauseFrequency: 4,
+      contrastBoost: 0.0,
+      headroom: 1.0
+    }
+  };
+
+  const atmosphere: AtmosphereProfile = {
+    effects: ['none'],
+    lightingTint: 'rgba(0,0,0,0)',
+    ambientIntensity: 1.0
+  };
+
+  const rhythm: SceneRhythm = {
+    tempo: 'medium',
+    pauseFrequencyPerMinute: 4,
+    motionEnergyCurve: 'linear'
+  };
+
   return {
     id: 'scene_001',
     version: 0,
     actors: [],
     environment,
     camera,
-    sessionHistory: []
+    sessionHistory: [],
+    cinematicGrammar,
+    atmosphere,
+    relationships: [],
+    rhythm
   };
 }
 
@@ -118,6 +146,22 @@ export const sceneStore = {
         newActor.joints = initActorJoints(newActor.position);
         return newActor;
       });
+    }
+
+    if (patch.cinematicGrammar) {
+      draft.cinematicGrammar = deepMerge(draft.cinematicGrammar, patch.cinematicGrammar);
+    }
+
+    if (patch.atmosphere) {
+      draft.atmosphere = deepMerge(draft.atmosphere, patch.atmosphere);
+    }
+
+    if (Array.isArray(patch.relationships)) {
+      draft.relationships = patch.relationships;
+    }
+
+    if (patch.rhythm) {
+      draft.rhythm = deepMerge(draft.rhythm, patch.rhythm);
     }
 
     draft.version += 1;

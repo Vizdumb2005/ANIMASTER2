@@ -21,9 +21,9 @@ type ScenePatch = {
     type: 'humanoid';
     position: { x: number; y: number };
     targetPosition: { x: number; y: number } | null;
-    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous';
-    currentAction: 'idle' | 'walking' | 'sitting';
-    actionQueue: Array<'idle' | 'walking' | 'sitting'>;
+    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous' | 'excited' | 'awkward' | 'angry' | 'exhausted';
+    currentAction: 'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing';
+    actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'>;
     joints: {
       head: { x: number; y: number };
       torso: { x: number; y: number };
@@ -42,7 +42,36 @@ type ScenePatch = {
     width: number;
     height: number;
   };
-  camera: { x: number; y: number; zoom: number; mode: 'static' | 'follow' };
+  camera: { x: number; y: number; zoom: number; mode: string };
+  cinematicGrammar?: {
+    tone: string;
+    template: {
+      cameraMode: string;
+      spacingMultiplier: number;
+      motionEnergyScale: number;
+      pauseFrequency: number;
+      contrastBoost: number;
+      headroom: number;
+    };
+  };
+  atmosphere?: {
+    effects: string[];
+    lightingTint: string;
+    ambientIntensity: number;
+  };
+  relationships?: Array<{
+    actorAId: string;
+    actorBId: string;
+    type: string;
+    awarenessRadius: number;
+    gazeTarget: string | null;
+    emotionalReaction: string | null;
+  }>;
+  rhythm?: {
+    tempo: string;
+    pauseFrequencyPerMinute: number;
+    motionEnergyCurve: string;
+  };
 };
 
 const router = Router();

@@ -14,9 +14,9 @@ type SceneGraphResponse = {
     type: 'humanoid';
     position: { x: number; y: number };
     targetPosition: { x: number; y: number } | null;
-    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous';
-    currentAction: 'idle' | 'walking' | 'sitting';
-    actionQueue: Array<'idle' | 'walking' | 'sitting'>;
+    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous' | 'excited' | 'awkward' | 'angry' | 'exhausted';
+    currentAction: 'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing';
+    actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'>;
     joints: {
       head: { x: number; y: number };
       torso: { x: number; y: number };
@@ -35,8 +35,37 @@ type SceneGraphResponse = {
     width: number;
     height: number;
   };
-  camera: { x: number; y: number; zoom: number; mode: 'static' | 'follow' };
+  camera: { x: number; y: number; zoom: number; mode: string };
   sessionHistory: Array<{ id: string; prompt: string; createdAt: number }>;
+  cinematicGrammar: {
+    tone: string;
+    template: {
+      cameraMode: string;
+      spacingMultiplier: number;
+      motionEnergyScale: number;
+      pauseFrequency: number;
+      contrastBoost: number;
+      headroom: number;
+    };
+  };
+  atmosphere: {
+    effects: string[];
+    lightingTint: string;
+    ambientIntensity: number;
+  };
+  relationships: Array<{
+    actorAId: string;
+    actorBId: string;
+    type: string;
+    awarenessRadius: number;
+    gazeTarget: string | null;
+    emotionalReaction: string | null;
+  }>;
+  rhythm: {
+    tempo: string;
+    pauseFrequencyPerMinute: number;
+    motionEnergyCurve: string;
+  };
 };
 
 const router = Router();
@@ -189,7 +218,29 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
         prompt,
         createdAt: Date.now()
       }
-    ]
+    ],
+    cinematicGrammar: {
+      tone: isSad ? 'sad' : isNervous ? 'tense' : 'neutral',
+      template: {
+        cameraMode: 'static',
+        spacingMultiplier: 1.0,
+        motionEnergyScale: 1.0,
+        pauseFrequency: 4,
+        contrastBoost: 0.0,
+        headroom: 1.0
+      }
+    },
+    atmosphere: {
+      effects: ['none'],
+      lightingTint: 'rgba(0,0,0,0)',
+      ambientIntensity: 1.0
+    },
+    relationships: [],
+    rhythm: {
+      tempo: 'medium',
+      pauseFrequencyPerMinute: 4,
+      motionEnergyCurve: 'linear'
+    }
   };
 }
 
@@ -202,7 +253,11 @@ function normalizeSceneGraph(scene: SceneGraphResponse, prompt: string): SceneGr
     actors: Array.isArray(scene.actors) && scene.actors.length > 0 ? scene.actors : fallback.actors,
     environment: scene.environment ?? fallback.environment,
     camera: scene.camera ?? fallback.camera,
-    sessionHistory: Array.isArray(scene.sessionHistory) ? scene.sessionHistory : fallback.sessionHistory
+    sessionHistory: Array.isArray(scene.sessionHistory) ? scene.sessionHistory : fallback.sessionHistory,
+    cinematicGrammar: scene.cinematicGrammar ?? fallback.cinematicGrammar,
+    atmosphere: scene.atmosphere ?? fallback.atmosphere,
+    relationships: Array.isArray(scene.relationships) ? scene.relationships : fallback.relationships,
+    rhythm: scene.rhythm ?? fallback.rhythm
   };
 }
 
