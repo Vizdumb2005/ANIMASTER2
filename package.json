@@ -1,0 +1,13 @@
+{
+  "name": "animaster",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "build": "npm run build -w client && npm run build -w server",
+    "dev": "npm run dev -w client & npm run dev -w server"
+  }
+}
