@@ -5,13 +5,28 @@ const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 
 type InterpretResponse = SceneGraph;
 
 export async function interpretScene(prompt: string): Promise<SceneGraph> {
-  const response = await fetch(`${apiBaseUrl}/interpret`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ prompt })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 35000);
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/interpret`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prompt }),
+      signal: controller.signal
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out — please try again');
+    }
+    throw new Error('Network error — check your connection and try again');
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const details = await readErrorMessage(response);

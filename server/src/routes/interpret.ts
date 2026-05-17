@@ -53,6 +53,10 @@ router.post('/', async (request, response) => {
     const scene = await interpretPrompt(prompt);
     response.json(scene);
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      response.status(504).json({ error: 'Request timed out — please try again' });
+      return;
+    }
     const message = error instanceof Error ? error.message : 'Unable to interpret prompt';
     response.status(502).json({ error: message });
   }
@@ -66,7 +70,12 @@ async function interpretPrompt(prompt: string): Promise<SceneGraphResponse> {
     return createFallbackScene(prompt);
   }
 
-  const result = await fetch('https://api.openai.com/v1/chat/completions', {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  let result: Response;
+  try {
+    result = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -87,23 +96,40 @@ async function interpretPrompt(prompt: string): Promise<SceneGraphResponse> {
         }
       },
       temperature: 0.2
-    })
+    }),
+    signal: controller.signal
   });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!result.ok) {
     throw new Error(`OpenAI request failed with status ${result.status}`);
   }
 
-  const payload = (await result.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
+  let payload: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    payload = (await result.json()) as typeof payload;
+  } catch {
+    console.error('Failed to parse OpenAI JSON response, using fallback');
+    return createFallbackScene(prompt);
+  }
+
   const content = payload.choices?.[0]?.message?.content;
 
   if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('OpenAI response did not include scene JSON');
+    console.error('OpenAI response did not include content, using fallback');
+    return createFallbackScene(prompt);
   }
 
-  const parsed = JSON.parse(content) as SceneGraphResponse;
+  let parsed: SceneGraphResponse;
+  try {
+    parsed = JSON.parse(content) as SceneGraphResponse;
+  } catch {
+    console.error('Malformed JSON from OpenAI, using fallback');
+    return createFallbackScene(prompt);
+  }
+
   return normalizeSceneGraph(parsed, prompt);
 }
 

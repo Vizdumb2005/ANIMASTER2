@@ -1,5 +1,7 @@
 import CanvasView from './components/CanvasView';
 import PromptBar from './components/PromptBar';
+import SessionSidebar from './components/SessionSidebar';
+import DebugPanel from './components/DebugPanel';
 
 export default function App() {
   return (
@@ -19,6 +21,9 @@ export default function App() {
       <section className="canvas-frame">
         <CanvasView />
       </section>
+
+      <SessionSidebar />
+      <DebugPanel />
     </main>
   );
 }

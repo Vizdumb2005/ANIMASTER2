@@ -1,10 +1,8 @@
-export const sceneGenerationResponseSchema = {
+export const sceneMutationResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'version', 'actors', 'environment', 'camera', 'sessionHistory'],
+  required: ['actors', 'environment', 'camera'],
   properties: {
-    id: { type: 'string' },
-    version: { type: 'number' },
     actors: {
       type: 'array',
       items: {
@@ -84,19 +82,6 @@ export const sceneGenerationResponseSchema = {
         zoom: { type: 'number' },
         mode: { enum: ['static', 'follow'] }
       }
-    },
-    sessionHistory: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['id', 'prompt', 'createdAt'],
-        properties: {
-          id: { type: 'string' },
-          prompt: { type: 'string' },
-          createdAt: { type: 'number' }
-        }
-      }
     }
   },
   $defs: {
@@ -112,38 +97,42 @@ export const sceneGenerationResponseSchema = {
   }
 } as const;
 
-export const sceneGenerationSystemPrompt = `
-You are Animaster's scene generator.
+export const sceneMutationSystemPrompt = `
+You are Animaster's scene mutation engine.
 
-Convert the user's prompt into one complete SceneGraph JSON object.
+You receive the CURRENT scene state and a user edit instruction.
+Return a COMPLETE scene patch that reflects the requested change.
 
 Rules:
-- Output JSON only. Do not wrap the result in markdown.
-- Include every required SceneGraph field exactly once.
-- Use the schema exactly as provided.
-- Always produce at least one humanoid actor.
-- Infer environment, emotion, posture, and action from the prompt.
-- IMPORTANT: When the prompt describes sequential actions (e.g. "walks and sits", "runs then jumps"), set currentAction to the FIRST action and populate actionQueue with the REMAINING actions in order. The runtime will automatically advance through the queue.
-  - Example: "walks and sits" → currentAction: "walking", actionQueue: ["sitting"]
-  - Example: "sits then walks" → currentAction: "sitting", actionQueue: ["walking"]
-  - Example: "walks into a room and sits down" → currentAction: "walking", actionQueue: ["sitting"]
-- If the prompt only describes one action, set currentAction to that action and leave actionQueue empty.
-- When an actor is walking, always set targetPosition to a destination point. Use x:660 as a default right-side target.
+- Output JSON only. No markdown wrappers.
+- The response must contain actors, environment, and camera fields.
+- Preserve ALL existing actors, their positions, actions, and states unless the edit explicitly changes them.
+- When the user says "make the room darker" or similar lighting edits, darken the environment colors but keep all actors unchanged.
+- When the user says "make him nervous" or similar emotion edits, change only the referenced actor's emotionState.
+- When the user says "add another character", append a new actor to the actors array while preserving all existing actors.
+- When adding a new actor, give it a unique id (e.g. "actor_2"), a descriptive label, and place it at a different position from existing actors.
+- New actors should default to idle action with empty actionQueue unless the prompt specifies otherwise.
 - Keep joints consistent with actor position. Head is ~58px above position.y, torso ~30px above, arms ~28px to each side and ~10px above, legs ~18px to each side and ~42px below.
-- Always include a sessionHistory entry with the user's prompt.
+- Do NOT regenerate the entire scene. Only change what the edit instruction asks for.
 
 Schema:
-${JSON.stringify(sceneGenerationResponseSchema, null, 2)}
+${JSON.stringify(sceneMutationResponseSchema, null, 2)}
 
 Examples:
-1. Prompt: "A sad stickman walks into a room and sits."
-   Output: one humanoid actor, sad emotion, indoor room, currentAction "walking", actionQueue ["sitting"], targetPosition {x:660,y:360}, darker colors, sessionHistory with prompt.
-2. Prompt: "A nervous character stands in a bright room."
-   Output: one humanoid actor, nervous emotion, bright room, currentAction "idle", actionQueue [], no targetPosition.
-3. Prompt: "Two stickmen in a dark room, one walking."
-   Output: two humanoid actors, one walking with targetPosition, one idle. Dark environment colors.
+
+1. Edit: "Make the room darker."
+   → Darken backgroundColor, floorColor, wallColor. Keep all actors exactly as they are.
+
+2. Edit: "Make him nervous."
+   → Change actors[0].emotionState to "nervous". Keep everything else unchanged.
+
+3. Edit: "Add another character standing in the corner."
+   → Keep existing actors, append new actor with id "actor_2", position at far right (e.g. x:800), idle action.
+
+4. Edit: "Make the lighting warmer."
+   → Shift environment colors toward warm tones (#2d1d12 style). Keep actors unchanged.
 `.trim();
 
-export function buildSceneGenerationUserPrompt(prompt: string) {
-  return `User prompt: ${prompt}\nReturn only the SceneGraph JSON object.`;
+export function buildSceneMutationUserPrompt(prompt: string, currentScene: string) {
+  return `Current scene state:\n${currentScene}\n\nUser edit instruction: ${prompt}\n\nReturn the complete patched scene JSON with actors, environment, and camera.`;
 }

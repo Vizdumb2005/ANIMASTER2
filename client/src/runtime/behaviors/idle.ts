@@ -2,6 +2,12 @@ import { Actor } from '@animaster/shared/scene';
 import { initActorJoints } from '../initActorJoints';
 
 export function evaluateIdle(actor: Actor, deltaMs: number): Actor {
+  if (actor.actionQueue.length > 0) {
+    actor.currentAction = actor.actionQueue.shift()!;
+    actor.actionElapsed = 0;
+    return actor;
+  }
+
   const baseJoints = initActorJoints(actor.position);
   const elapsed = actor.actionElapsed;
   const idleOscillation = Math.sin(elapsed * 0.002) * 2;

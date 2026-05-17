@@ -20,29 +20,42 @@ function createDefaultScene(): SceneGraph {
     mode: 'static'
   };
 
-  const actor: Actor = {
-    id: 'actor_stickman',
-    label: 'Stickman',
-    type: 'humanoid',
-    position: { x: 400, y: 360 },
-    targetPosition: { x: 660, y: 360 },
-    emotionState: 'sad',
-    currentAction: 'walking',
-    actionQueue: ['sitting'],
-    joints: initActorJoints({ x: 400, y: 360 }),
-    actionElapsed: 0
-  };
-
-  const sessionHistory: SessionEntry[] = [];
-
   return {
     id: 'scene_001',
-    version: 1,
-    actors: [actor],
+    version: 0,
+    actors: [],
     environment,
     camera,
-    sessionHistory
+    sessionHistory: []
   };
+}
+
+function deepMerge<T>(target: T, source: Partial<T>): T {
+  const result = { ...target } as Record<string, unknown>;
+  const src = source as Record<string, unknown>;
+  const tgt = target as Record<string, unknown>;
+  for (const key of Object.keys(src)) {
+    const sourceVal = src[key];
+    const targetVal = tgt[key];
+    if (
+      sourceVal !== null &&
+      sourceVal !== undefined &&
+      typeof sourceVal === 'object' &&
+      !Array.isArray(sourceVal) &&
+      targetVal !== null &&
+      targetVal !== undefined &&
+      typeof targetVal === 'object' &&
+      !Array.isArray(targetVal)
+    ) {
+      result[key] = deepMerge(
+        targetVal as Record<string, unknown>,
+        sourceVal as Record<string, unknown>
+      );
+    } else if (sourceVal !== undefined) {
+      result[key] = sourceVal;
+    }
+  }
+  return result as T;
 }
 
 let currentScene = createDefaultScene();
@@ -66,13 +79,57 @@ export const sceneStore = {
 
   setScene(scene: SceneGraph) {
     currentScene = cloneScene(scene);
+    for (const actor of currentScene.actors) {
+      actor.joints = initActorJoints(actor.position);
+    }
     notify();
   },
 
   mutateScene(mutator: (scene: SceneGraph) => void) {
     const draft = cloneScene(currentScene);
     mutator(draft);
+    currentScene = draft;
+    notify();
+  },
+
+  applyPatch(patch: Partial<SceneGraph>, prompt: string) {
+    const draft = cloneScene(currentScene);
+
+    if (patch.environment) {
+      draft.environment = deepMerge(draft.environment, patch.environment);
+    }
+
+    if (patch.camera) {
+      draft.camera = deepMerge(draft.camera, patch.camera);
+    }
+
+    if (Array.isArray(patch.actors)) {
+      draft.actors = patch.actors.map((patchActor) => {
+        const existing = draft.actors.find((a) => a.id === patchActor.id);
+        if (existing) {
+          const merged = deepMerge(
+            existing as unknown as Record<string, unknown>,
+            patchActor as unknown as Record<string, unknown>
+          ) as unknown as Actor;
+          merged.joints = initActorJoints(merged.position);
+          return merged;
+        }
+        const newActor = { ...patchActor };
+        newActor.joints = initActorJoints(newActor.position);
+        return newActor;
+      });
+    }
+
     draft.version += 1;
+    draft.sessionHistory = [
+      ...draft.sessionHistory,
+      {
+        id: `session_entry_${draft.sessionHistory.length + 1}`,
+        prompt,
+        createdAt: Date.now()
+      }
+    ];
+
     currentScene = draft;
     notify();
   },

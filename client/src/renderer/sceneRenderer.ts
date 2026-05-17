@@ -7,6 +7,9 @@ function clearLayer(layer: Container) {
   layer.removeChildren();
 }
 
+let cameraX = 0;
+let cameraY = 0;
+
 function applyCameraTransform(actorLayer: Container, scene: SceneGraph, width: number, height: number) {
   const targetActor = scene.actors[0];
   const camera = scene.camera;
@@ -14,8 +17,15 @@ function applyCameraTransform(actorLayer: Container, scene: SceneGraph, width: n
   actorLayer.scale.set(camera.zoom);
 
   if (camera.mode === 'follow' && targetActor) {
-    actorLayer.position.set(width * 0.5 - targetActor.position.x * camera.zoom, height * 0.5 - targetActor.position.y * camera.zoom);
+    const desiredX = width * 0.5 - targetActor.position.x * camera.zoom;
+    const desiredY = height * 0.5 - targetActor.position.y * camera.zoom;
+    const lerpFactor = 0.08;
+    cameraX += (desiredX - cameraX) * lerpFactor;
+    cameraY += (desiredY - cameraY) * lerpFactor;
+    actorLayer.position.set(cameraX, cameraY);
   } else {
+    cameraX = camera.x;
+    cameraY = camera.y;
     actorLayer.position.set(camera.x, camera.y);
   }
 }

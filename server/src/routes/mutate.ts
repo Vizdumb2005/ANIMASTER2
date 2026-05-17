@@ -1,0 +1,215 @@
+import { Router } from 'express';
+import {
+  buildSceneMutationUserPrompt,
+  sceneMutationResponseSchema,
+  sceneMutationSystemPrompt
+} from '../prompts/sceneMutationPrompt.js';
+
+type MutateRequestBody = {
+  prompt: string;
+  currentScene: {
+    actors: unknown[];
+    environment: unknown;
+    camera: unknown;
+  };
+};
+
+type ScenePatch = {
+  actors: Array<{
+    id: string;
+    label: string;
+    type: 'humanoid';
+    position: { x: number; y: number };
+    targetPosition: { x: number; y: number } | null;
+    emotionState: 'neutral' | 'sad' | 'happy' | 'nervous';
+    currentAction: 'idle' | 'walking' | 'sitting';
+    actionQueue: Array<'idle' | 'walking' | 'sitting'>;
+    joints: {
+      head: { x: number; y: number };
+      torso: { x: number; y: number };
+      leftArm: { x: number; y: number };
+      rightArm: { x: number; y: number };
+      leftLeg: { x: number; y: number };
+      rightLeg: { x: number; y: number };
+    };
+    actionElapsed: number;
+  }>;
+  environment: {
+    type: string;
+    backgroundColor: string;
+    floorColor: string;
+    wallColor: string;
+    width: number;
+    height: number;
+  };
+  camera: { x: number; y: number; zoom: number; mode: 'static' | 'follow' };
+};
+
+const router = Router();
+
+router.post('/', async (request, response) => {
+  const body = request.body as Partial<MutateRequestBody> | undefined;
+  const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+
+  if (!prompt) {
+    response.status(400).json({ error: 'prompt is required' });
+    return;
+  }
+
+  if (!body?.currentScene || typeof body.currentScene !== 'object') {
+    response.status(400).json({ error: 'currentScene is required' });
+    return;
+  }
+
+  try {
+    const patch = await mutateScene(prompt, body.currentScene);
+    response.json(patch);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to mutate scene';
+    response.status(502).json({ error: message });
+  }
+});
+
+async function mutateScene(prompt: string, currentScene: unknown): Promise<ScenePatch> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+
+  if (!apiKey) {
+    return createFallbackPatch(prompt, currentScene as ScenePatch);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const result = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: sceneMutationSystemPrompt },
+          { role: 'user', content: buildSceneMutationUserPrompt(prompt, JSON.stringify(currentScene, null, 2)) }
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'animaster_scene_patch',
+            schema: sceneMutationResponseSchema,
+            strict: true
+          }
+        },
+        temperature: 0.2
+      }),
+      signal: controller.signal
+    });
+
+    if (!result.ok) {
+      throw new Error(`OpenAI request failed with status ${result.status}`);
+    }
+
+    const payload = (await result.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = payload.choices?.[0]?.message?.content;
+
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('OpenAI response did not include patch JSON');
+    }
+
+    const parsed = JSON.parse(content) as ScenePatch;
+    return normalizePatch(parsed, currentScene as ScenePatch);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePatch {
+  const scene: ScenePatch = {
+    actors: Array.isArray(currentScene.actors) ? [...currentScene.actors] : [],
+    environment: currentScene.environment ?? {
+      type: 'indoor_room',
+      backgroundColor: '#17151f',
+      floorColor: '#2d221f',
+      wallColor: '#211c29',
+      width: 960,
+      height: 540
+    },
+    camera: currentScene.camera ?? { x: 0, y: 0, zoom: 1, mode: 'static' as const }
+  };
+
+  if (/darker|dim/i.test(prompt)) {
+    scene.environment = {
+      ...scene.environment,
+      backgroundColor: '#0d0b14',
+      floorColor: '#1f1815',
+      wallColor: '#17131d'
+    };
+  } else if (/warmer|warm/i.test(prompt)) {
+    scene.environment = {
+      ...scene.environment,
+      backgroundColor: '#2d1d12',
+      floorColor: '#3a2b1f',
+      wallColor: '#2a1e15'
+    };
+  } else if (/brighter|bright|lighter/i.test(prompt)) {
+    scene.environment = {
+      ...scene.environment,
+      backgroundColor: '#2a2535',
+      floorColor: '#3d3228',
+      wallColor: '#302a38'
+    };
+  }
+
+  if (/nervous|anxious/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'nervous' };
+  } else if (/sad|depressed/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'sad' };
+  } else if (/happy|cheerful/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'happy' };
+  } else if (/neutral|calm/i.test(prompt) && scene.actors.length > 0) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'neutral' };
+  }
+
+  if (/add\s+(another|a\s+new|a\s+second)\s+(character|stickman|actor|person)/i.test(prompt)) {
+    const newId = `actor_${scene.actors.length + 1}`;
+    const posX = 800;
+    const posY = 360;
+    scene.actors.push({
+      id: newId,
+      label: 'Stickman',
+      type: 'humanoid',
+      position: { x: posX, y: posY },
+      targetPosition: null,
+      emotionState: 'neutral',
+      currentAction: 'idle',
+      actionQueue: [],
+      joints: {
+        head: { x: posX, y: posY - 58 },
+        torso: { x: posX, y: posY - 30 },
+        leftArm: { x: posX - 28, y: posY - 10 },
+        rightArm: { x: posX + 28, y: posY - 10 },
+        leftLeg: { x: posX - 18, y: posY + 42 },
+        rightLeg: { x: posX + 18, y: posY + 42 }
+      },
+      actionElapsed: 0
+    });
+  }
+
+  return scene;
+}
+
+function normalizePatch(patch: ScenePatch, currentScene: ScenePatch): ScenePatch {
+  return {
+    actors: Array.isArray(patch.actors) && patch.actors.length > 0
+      ? patch.actors
+      : (Array.isArray(currentScene.actors) ? currentScene.actors : []),
+    environment: patch.environment ?? currentScene.environment,
+    camera: patch.camera ?? currentScene.camera
+  };
+}
+
+export default router;
