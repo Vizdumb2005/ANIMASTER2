@@ -3,6 +3,7 @@ import { Application, Container } from 'pixi.js';
 import { sceneStore } from '../store/sceneStore';
 import { startTickLoop } from '../runtime/tickLoop';
 import { evaluateActor } from '../runtime/actorEvaluator';
+import { evaluateScene } from '../runtime/sceneEvaluator';
 import { clearAndRedrawScene } from '../renderer/sceneRenderer';
 
 export default function CanvasView() {
@@ -38,24 +39,26 @@ export default function CanvasView() {
       host.replaceChildren(app.canvas);
       app.stage.addChild(backgroundLayer, actorLayer, uiLayer);
 
-      const redraw = () => {
+      const redraw = (deltaMs?: number) => {
         clearAndRedrawScene({
           backgroundLayer,
           actorLayer,
           uiLayer,
           scene: sceneStore.getScene(),
           width: app.renderer.width,
-          height: app.renderer.height
+          height: app.renderer.height,
+          deltaMs
         });
       };
 
-      unsubscribe = sceneStore.onSceneChange(redraw);
       redraw();
 
       stopLoop = startTickLoop((deltaMs) => {
         sceneStore.mutateScene((scene) => {
           scene.actors = scene.actors.map((actor) => evaluateActor(actor, deltaMs, scene));
+          evaluateScene(scene);
         });
+        redraw(deltaMs);
       });
     };
 
@@ -65,7 +68,13 @@ export default function CanvasView() {
       disposed = true;
       stopLoop();
       unsubscribe();
-      app.destroy(true);
+      try {
+        if (app.renderer) {
+          app.destroy(true);
+        }
+      } catch {
+        // PixiJS may throw if app was not fully initialized
+      }
     };
   }, []);
 

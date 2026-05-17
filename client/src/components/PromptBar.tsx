@@ -1,6 +1,8 @@
 import { FormEvent, useState } from 'react';
 import { interpretScene } from '../services/interpretService';
+import { mutateScene } from '../services/mutateService';
 import { sceneStore } from '../store/sceneStore';
+import { initActorJoints } from '../runtime/initActorJoints';
 
 export default function PromptBar() {
   const [prompt, setPrompt] = useState('A sad stickman walks into a room and sits.');
@@ -19,8 +21,19 @@ export default function PromptBar() {
     setError(null);
 
     try {
-      const scene = await interpretScene(trimmedPrompt);
-      sceneStore.setScene(scene);
+      const currentScene = sceneStore.getScene();
+      const hasExistingScene = currentScene.actors.length > 0 && currentScene.version > 0;
+
+      if (hasExistingScene) {
+        const patch = await mutateScene(trimmedPrompt, currentScene);
+        sceneStore.applyPatch(patch, trimmedPrompt);
+      } else {
+        const scene = await interpretScene(trimmedPrompt);
+        for (const actor of scene.actors) {
+          actor.joints = initActorJoints(actor.position);
+        }
+        sceneStore.setScene(scene);
+      }
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : 'Unable to interpret prompt');
     } finally {
@@ -46,7 +59,11 @@ export default function PromptBar() {
           {isLoading ? 'Interpreting…' : 'Generate'}
         </button>
       </div>
-      <p className="prompt-help">The first task uses the server to turn plain language into a SceneGraph.</p>
+      <p className="prompt-help">
+        {sceneStore.getScene().version > 0
+          ? 'Scene exists — edits will mutate the current scene.'
+          : 'The first prompt creates a new scene from scratch.'}
+      </p>
       {error ? <p className="prompt-error">{error}</p> : null}
     </form>
   );

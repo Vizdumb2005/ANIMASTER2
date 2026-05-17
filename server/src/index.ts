@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import interpretRouter from './routes/interpret.js';
+import mutateRouter from './routes/mutate.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.get('/health', (_request, response) => {
 });
 
 app.use('/interpret', interpretRouter);
+app.use('/mutate', mutateRouter);
 
 app.use((_request, response) => {
   response.status(404).json({ error: 'Not found' });

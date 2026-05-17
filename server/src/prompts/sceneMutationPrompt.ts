@@ -1,10 +1,8 @@
-export const sceneGenerationResponseSchema = {
+export const sceneMutationResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'version', 'actors', 'environment', 'camera', 'cinematicGrammar', 'atmosphere', 'relationships', 'rhythm', 'sessionHistory'],
+  required: ['actors', 'environment', 'camera', 'cinematicGrammar', 'atmosphere', 'relationships', 'rhythm'],
   properties: {
-    id: { type: 'string' },
-    version: { type: 'number' },
     actors: {
       type: 'array',
       items: {
@@ -141,19 +139,6 @@ export const sceneGenerationResponseSchema = {
         pauseFrequencyPerMinute: { type: 'number' },
         motionEnergyCurve: { enum: ['linear', 'ease-in', 'ease-out', 'sharp'] }
       }
-    },
-    sessionHistory: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['id', 'prompt', 'createdAt'],
-        properties: {
-          id: { type: 'string' },
-          prompt: { type: 'string' },
-          createdAt: { type: 'number' }
-        }
-      }
     }
   },
   $defs: {
@@ -169,49 +154,67 @@ export const sceneGenerationResponseSchema = {
   }
 } as const;
 
-export const sceneGenerationSystemPrompt = `
-You are Animaster's scene generator.
+export const sceneMutationSystemPrompt = `
+You are Animaster's scene mutation engine.
 
-Convert the user's prompt into one complete SceneGraph JSON object.
+You receive the CURRENT scene state and a user edit instruction.
+Return a COMPLETE scene patch that reflects the requested change.
 
 Rules:
-- Output JSON only. Do not wrap the result in markdown.
-- Include every required SceneGraph field exactly once.
-- Use the schema exactly as provided.
-- Always produce at least one humanoid actor.
-- Infer environment, emotion, posture, and action from the prompt.
-- IMPORTANT: When the prompt describes sequential actions (e.g. "walks and sits", "runs then jumps"), set currentAction to the FIRST action and populate actionQueue with the REMAINING actions in order. The runtime will automatically advance through the queue.
-  - Example: "walks and sits" → currentAction: "walking", actionQueue: ["sitting"]
-  - Example: "sits then walks" → currentAction: "sitting", actionQueue: ["walking"]
-  - Example: "walks into a room and sits down" → currentAction: "walking", actionQueue: ["sitting"]
-- If the prompt only describes one action, set currentAction to that action and leave actionQueue empty.
-- When an actor is walking, always set targetPosition to a destination point. Use x:660 as a default right-side target.
+- Output JSON only. No markdown wrappers.
+- The response must contain actors, environment, camera, cinematicGrammar, atmosphere, relationships, and rhythm fields.
+- Preserve ALL existing actors, their positions, actions, and states unless the edit explicitly changes them.
+- When the user says "make the room darker" or similar lighting edits, darken the environment colors but keep all actors unchanged.
+- When the user says "make him nervous" or similar emotion edits, change only the referenced actor's emotionState. Valid emotions: neutral, sad, happy, nervous, excited, awkward, angry, exhausted.
+- When the user says "add another character", append a new actor to the actors array while preserving all existing actors.
+- Valid actions: idle, walking, sitting, approaching, pacing.
 - Keep joints consistent with actor position. Head is ~58px above position.y, torso ~30px above, arms ~28px to each side and ~10px above, legs ~18px to each side and ~42px below.
-- Always include a sessionHistory entry with the user's prompt.
 
-## Phase 2 Fields
-- ALWAYS include cinematicGrammar, atmosphere, relationships, and rhythm fields.
-- Infer the scene tone from the prompt: sad, tense, lonely, awkward, energetic, romantic, threatening, or neutral.
-- Set cinematicGrammar.tone and template based on inferred tone (e.g. lonely → wide_shot camera, high spacing, low energy).
-- Set atmosphere effects and lightingTint based on the environment (e.g. night scene → lightingTint 'night', streetlight → flicker effect).
-- If multiple actors exist, populate relationships array with their spatial relationship.
-- Set rhythm tempo based on scene energy (slow for lonely/sad, fast for energetic).
-- Valid emotions: neutral, sad, happy, nervous, excited, awkward, angry, exhausted.
-- Valid actions: idle, walking, sitting, approaching, pacing. Use 'approaching' for slow deliberate movement toward another actor.
+## Tonal Edits (Phase 2)
+- When the user says "make the scene feel more lonely/tense/sad/etc.", update the cinematicGrammar.tone and template accordingly.
+- Lonely: wide_shot camera, high spacing, low energy, cold lighting.
+- Tense: close_up or tension camera, low spacing, high energy, high contrast.
+- Sad: wide_shot camera, high spacing, low energy, cool lighting tint.
+
+## Camera Edits
 - Camera modes: static, follow, close_up, wide_shot, over_the_shoulder, dramatic_zoom, tension.
+- Match camera mode to scene tone when editing mood.
+
+## Atmosphere Edits
+- Effects: rain, fog, flicker, dust, none.
+- lightingTint: warm, cold, night, or rgba(0,0,0,0) for no tint.
+- When user says "add rain", add 'rain' to effects array.
+- When user says "colder lighting", set lightingTint to 'cold'.
+
+## Relationship Edits
+- When user says "have the character stop and hesitate", change their currentAction to 'idle' and update relationships.
+- Relationship types: stranger, approaching, confronting, avoiding, conversing.
+
+## Rhythm
+- tempo: slow, medium, fast.
+- motionEnergyCurve: linear, ease-in, ease-out, sharp.
+- Lonely/sad scenes should have slow tempo and high pauseFrequencyPerMinute.
+
+- Do NOT regenerate the entire scene. Only change what the edit instruction asks for.
 
 Schema:
-${JSON.stringify(sceneGenerationResponseSchema, null, 2)}
+${JSON.stringify(sceneMutationResponseSchema, null, 2)}
 
 Examples:
-1. Prompt: "A sad stickman walks into a room and sits."
-   Output: one humanoid actor, sad emotion, indoor room, currentAction "walking", actionQueue ["sitting"], targetPosition {x:660,y:360}, darker colors, cinematicGrammar tone 'sad', wide_shot camera, rhythm tempo 'slow'.
-2. Prompt: "A nervous stickman waits under a flickering streetlight while another character approaches slowly from the distance."
-   Output: two actors, nervous+neutral emotions, street environment, first actor idle, second approaching with targetPosition, atmosphere with flicker effect and night tint, cinematicGrammar tone 'tense', relationships array, rhythm tempo 'slow'.
-3. Prompt: "Two stickmen in a dark room, one walking."
-   Output: two humanoid actors, one walking with targetPosition, one idle. Dark environment, relationships array.
+
+1. Edit: "Make the room darker."
+   → Darken backgroundColor, floorColor, wallColor. Keep all actors and other fields as they are.
+
+2. Edit: "Make the scene feel more lonely."
+   → Set cinematicGrammar.tone to 'lonely', template.cameraMode to 'wide_shot', increase spacingMultiplier, decrease motionEnergyScale, set atmosphere.lightingTint to 'cold', increase rhythm.pauseFrequencyPerMinute.
+
+3. Edit: "Add rain and make the lighting colder."
+   → Add 'rain' to atmosphere.effects, set atmosphere.lightingTint to 'cold'. Keep actors unchanged.
+
+4. Edit: "Have the approaching character stop and hesitate."
+   → Change the approaching actor's currentAction to 'idle', update relationship type.
 `.trim();
 
-export function buildSceneGenerationUserPrompt(prompt: string) {
-  return `User prompt: ${prompt}\nReturn only the SceneGraph JSON object.`;
+export function buildSceneMutationUserPrompt(prompt: string, currentScene: string) {
+  return `Current scene state:\n${currentScene}\n\nUser edit instruction: ${prompt}\n\nReturn the complete patched scene JSON with actors, environment, and camera.`;
 }
