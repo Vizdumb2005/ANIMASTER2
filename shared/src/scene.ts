@@ -228,6 +228,102 @@ export interface SemanticMutationRecord {
   operations: SemanticMutationOperation[];
 }
 
+// --- Phase 2.6: Emotional Spatial Intelligence ---
+
+export type SpatialIntent = 'intimacy' | 'isolation' | 'confrontation' | 'vulnerability' | 'avoidance' | 'dominance' | 'neutral';
+
+export interface EmotionalSpatialState {
+  spatialIntent: SpatialIntent;
+  negativeSpaceRatio: number;
+  frameEdgeBias: { x: number; y: number };
+  compositionTension: number;
+}
+
+// --- Phase 2.6: Dramatic Timing ---
+
+export type BeatType = 'anticipation' | 'silence' | 'reaction' | 'tension_hold' | 'release' | 'interruption';
+
+export interface DramaticBeat {
+  type: BeatType;
+  durationMs: number;
+  elapsedMs: number;
+  intensity: number;
+}
+
+// --- Phase 2.6: Shot Intent ---
+
+export type ShotIntentType = 'establish' | 'reveal' | 'emphasize' | 'isolate' | 'confront' | 'observe' | 'compress';
+
+export interface ShotIntent {
+  intent: ShotIntentType;
+  subject: string;
+  intensity: number;
+}
+
+// --- Phase 2.6: Attention Focus ---
+
+export interface AttentionFocus {
+  primaryTarget: string;
+  secondaryTargets: string[];
+  focusIntensity: number;
+  motionContrast: number;
+}
+
+// --- Phase 2.6: Deep Acting ---
+
+export interface DeepActingState {
+  postureOpenness: number;
+  gazeAversion: number;
+  emotionalRecoveryTimer: number;
+  nervousRepetitionCount: number;
+  breathingRate: 'slow' | 'normal' | 'fast';
+}
+
+// --- Phase 2.6: Composition Metrics ---
+
+export interface CompositionMetrics {
+  ruleOfThirdsScore: number;
+  negativeSpaceBalance: number;
+  visualWeight: { left: number; right: number };
+  silhouetteClarity: number;
+  depthSeparation: number;
+}
+
+// --- Phase 2.6: Power Dynamics ---
+
+export type PowerDynamicType = 'dominance' | 'submission' | 'avoidance' | 'pursuit' | 'withdrawal' | 'balanced';
+
+export interface PowerDynamic {
+  actorAId: string;
+  actorBId: string;
+  dominantActorId: string | null;
+  submissiveActorId: string | null;
+  powerBalance: number;
+  dynamicType: PowerDynamicType;
+}
+
+// --- Phase 2.6: Tension State ---
+
+export interface TensionState {
+  currentLevel: number;
+  peakLevel: number;
+  escalationRate: number;
+  compressionFactor: number;
+  cameraIntensityBoost: number;
+}
+
+// --- Phase 2.6: Anticipation State ---
+
+export type AnticipationPhase = 'idle' | 'building' | 'peak' | 'release';
+
+export interface AnticipationState {
+  phase: AnticipationPhase;
+  buildDurationMs: number;
+  elapsedMs: number;
+  motionDamping: number;
+  cameraTightening: number;
+}
+
 // --- Scene Graph (expanded) ---
 
 export interface SceneGraph {
@@ -246,4 +342,13 @@ export interface SceneGraph {
   relationships: CharacterRelationship[];
   rhythm: SceneRhythm;
   continuity?: ContinuityState;
+  // Phase 2.6
+  emotionalSpatial?: EmotionalSpatialState;
+  dramaticBeats?: DramaticBeat[];
+  shotIntent?: ShotIntent;
+  attentionFocus?: AttentionFocus;
+  compositionMetrics?: CompositionMetrics;
+  powerDynamics?: PowerDynamic[];
+  tensionState?: TensionState;
+  anticipationState?: AnticipationState;
 }

@@ -187,6 +187,16 @@ export const sceneStore = {
       draft.rhythm = deepMerge(draft.rhythm, patch.rhythm);
     }
 
+    // Phase 2.6 fields are computed at runtime — clear them so they recompute
+    draft.emotionalSpatial = undefined;
+    draft.dramaticBeats = undefined;
+    draft.shotIntent = undefined;
+    draft.attentionFocus = undefined;
+    draft.compositionMetrics = undefined;
+    draft.powerDynamics = undefined;
+    draft.tensionState = undefined;
+    draft.anticipationState = undefined;
+
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
     if (Array.isArray(operations) && operations.length > 0) {
