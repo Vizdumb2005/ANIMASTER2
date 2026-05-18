@@ -106,8 +106,6 @@ export class CinematicRuntime {
         this.cameraController.setSmoothing(camSettings.smoothing);
         if (camSettings.handheld > 0) {
           this.cameraController.setRig('handheld');
-        if (camSettings.handheld > 0) {
-          this.cameraController.setRig('handheld');
         } else {
           this.cameraController.setRig('static');
         }
@@ -117,7 +115,6 @@ export class CinematicRuntime {
       this.sceneManager.setBackgroundColor(skyColors.bottom);
     }
 
-    if (envType !== this.currentEnvironment) {
     if (envType !== this.currentEnvironment) {
       this.currentEnvironment = envType;
       this.sceneManager.clearLayer('environment');
@@ -139,13 +136,12 @@ export class CinematicRuntime {
         const skyline = this.skylineGenerator.generate(skylineType);
         this.sceneManager.layers.background.add(skyline);
 
-        const skyColors = getSkyColorsForTone(this.currentTone);
-        const skyMat = createSkyGradientMaterial(skyColors.top, skyColors.bottom);
+        const skyColors2 = getSkyColorsForTone(this.currentTone);
+        const skyMat = createSkyGradientMaterial(skyColors2.top, skyColors2.bottom);
         const skyGeom = new THREE.SphereGeometry(50, 16, 8);
         const skyMesh = new THREE.Mesh(skyGeom, skyMat);
         this.sceneManager.layers.background.add(skyMesh);
       }
-
 
       this.audioManager.applyEnvironment(envType);
     }
