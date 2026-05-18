@@ -39,6 +39,9 @@ export function validateContinuity(scene: SceneGraph): ContinuityViolation[] {
     }
   }
 
-  scene.continuity.violations = violations;
+  const preservedViolations = scene.continuity.violations.filter(
+    (violation) => !violation.id.startsWith('spatial_') && !violation.id.startsWith('action_')
+  );
+  scene.continuity.violations = [...preservedViolations, ...violations];
   return violations;
 }
