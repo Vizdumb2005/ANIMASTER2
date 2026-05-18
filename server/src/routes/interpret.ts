@@ -173,7 +173,13 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const isSit = /sit/i.test(prompt);
   const isWalk = /walk|enter/i.test(prompt);
   const isApproach = /approach|comes|walks.*toward|comes.*closer/i.test(prompt);
-  const hasSecondActor = /another|second|someone|while.*character|two/i.test(prompt);
+  const isConfront = /argues?\s+with|confronts?|corners?|fights?\s+with|yells?\s+at/i.test(prompt);
+  const isComfort = /comforts?|consoles?|hugs?|holds?\s+hands?/i.test(prompt);
+  const isTalkTo = /talks?\s+to|speaks?\s+to|chats?\s+with|converses?\s+with/i.test(prompt);
+  const isWatchWith = /watches?\s+with|sits?\s+with|stands?\s+with|waits?\s+with/i.test(prompt);
+  const isAvoid = /avoids?|ignores?|turns?\s+away|walks?\s+away/i.test(prompt);
+  const hasRelational = isConfront || isComfort || isTalkTo || isWatchWith || isAvoid;
+  const hasSecondActor = /another|second|someone|while.*character|two/i.test(prompt) || hasRelational;
   const isPark = /park|garden|meadow/i.test(prompt);
   const isBeach = /beach|ocean|sea|shore/i.test(prompt);
   const isForest = /forest|woods|jungle/i.test(prompt);
@@ -224,14 +230,18 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
 
   if (hasSecondActor) {
     const secondAction = isApproach ? 'approaching' : 'idle';
-    const secondPos = { x: 850, y: 360 };
+    const relSpacing = isConfront ? 180 : isComfort ? 120 : isAvoid ? 500 : isTalkTo || isWatchWith ? 160 : 450;
+    const secondPos = { x: 400 + relSpacing, y: 360 };
+    const secondEmotion = isConfront ? 'angry' : isComfort ? 'sad' : isAvoid ? 'nervous' : 'neutral';
+    const relType = isConfront ? 'confronting' : isComfort ? 'approaching' : isAvoid ? 'avoiding' : isTalkTo || isWatchWith ? 'conversing' : isApproach ? 'approaching' : 'stranger';
+
     actors.push({
       id: 'actor_2',
       label: 'Stranger',
       type: 'humanoid',
       position: secondPos,
-      targetPosition: isApproach ? { x: 500, y: 360 } : null,
-      emotionState: 'neutral',
+      targetPosition: isApproach || isConfront ? { x: 500, y: 360 } : null,
+      emotionState: secondEmotion,
       currentAction: secondAction,
       actionQueue: ['idle'],
       joints: {
@@ -244,13 +254,20 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
       },
       actionElapsed: 0
     });
+
+    if (isConfront) {
+      actors[0] = { ...actors[0], emotionState: 'angry' };
+    } else if (isComfort) {
+      actors[0] = { ...actors[0], emotionState: 'sad' };
+    }
+
     relationships.push({
       actorAId: 'actor_stickman',
       actorBId: 'actor_2',
-      type: isApproach ? 'approaching' : 'stranger',
+      type: relType,
       awarenessRadius: 200,
       gazeTarget: 'actor_2',
-      emotionalReaction: null
+      emotionalReaction: isConfront ? 'angry' : isComfort ? 'sad' : null
     });
   }
 

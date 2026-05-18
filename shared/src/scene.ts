@@ -324,6 +324,117 @@ export interface AnticipationState {
   cameraTightening: number;
 }
 
+// --- Phase 2.7: Emotional Beat Runtime ---
+
+export type EmotionalBeatAction = 'neutral' | 'pause' | 'freeze' | 'collapse' | 'recoil' | 'approach' | 'step_back' | 'look_away' | 'glance' | 'fidget' | 'stillness' | 'attempt_contact' | 'avoidance' | 'retry';
+
+export interface EmotionalBeat {
+  action: EmotionalBeatAction;
+  durationMs: number;
+  elapsedMs: number;
+  emotionTarget: ActorEmotion | null;
+  intensityTarget: number;
+  cameraResponse: 'none' | 'push_in' | 'hold' | 'pull_back' | 'compress' | 'drift' | 'reframe';
+  spacingDelta: number;
+  motionDamping: number;
+}
+
+export interface BeatSequence {
+  id: string;
+  label: string;
+  beats: EmotionalBeat[];
+  currentIndex: number;
+  startedAtMs: number;
+  totalElapsedMs: number;
+  completed: boolean;
+  looping: boolean;
+}
+
+// --- Phase 2.7: Emotional Arcs ---
+
+export type ArcPhaseName = 'setup' | 'rising' | 'peak' | 'falling' | 'resolution';
+
+export interface ArcPhase {
+  name: ArcPhaseName;
+  targetEmotion: ActorEmotion;
+  targetIntensity: number;
+  durationMs: number;
+  elapsedMs: number;
+  atmosphereShift: { lightingTint?: string; ambientDelta?: number } | null;
+}
+
+export interface EmotionalArc {
+  id: string;
+  label: string;
+  phases: ArcPhase[];
+  currentPhaseIndex: number;
+  totalElapsedMs: number;
+  completed: boolean;
+}
+
+// --- Phase 2.7: Pose Language ---
+
+export interface PoseProfile {
+  torsoAngle: number;
+  headTilt: number;
+  armSpread: number;
+  stanceWidth: number;
+  centerOfGravityY: number;
+  shoulderSquare: number;
+}
+
+// --- Phase 2.7: Reaction Chains ---
+
+export type ReactionTrigger = 'approach_detected' | 'bad_news' | 'awkward_pause' | 'confrontation' | 'comfort' | 'avoidance_detected';
+
+export interface ReactionStep {
+  action: EmotionalBeatAction;
+  durationMs: number;
+  delayMs: number;
+}
+
+export interface ReactionChain {
+  trigger: ReactionTrigger;
+  steps: ReactionStep[];
+  currentStepIndex: number;
+  elapsedMs: number;
+  completed: boolean;
+}
+
+// --- Phase 2.7: Environment Story Anchors ---
+
+export type StoryAnchorType = 'rooftop_ledge' | 'window_silhouette' | 'bench' | 'doorway' | 'hallway' | 'corner_wall' | 'streetlight_silhouette' | 'rain_window' | 'skyline';
+
+export interface StoryAnchor {
+  id: string;
+  type: StoryAnchorType;
+  position: Vector2;
+  width: number;
+  height: number;
+}
+
+// --- Phase 2.7: Scene Evolution ---
+
+export interface SceneEvolution {
+  spacingTrajectory: number[];
+  postureTrajectory: number[];
+  pacingTrajectory: number[];
+  cameraZoomTrajectory: number[];
+  intensityTrajectory: number[];
+  sampleCount: number;
+  lifetimeMs: number;
+}
+
+// --- Phase 2.7: Cinematic Moment Score ---
+
+export interface CinematicMomentScore {
+  emotionalClarity: number;
+  poseReadability: number;
+  dramaticProgression: number;
+  beatCoherence: number;
+  overallScore: number;
+}
+
 // --- Scene Graph (expanded) ---
 
 export interface SceneGraph {
@@ -351,4 +462,11 @@ export interface SceneGraph {
   powerDynamics?: PowerDynamic[];
   tensionState?: TensionState;
   anticipationState?: AnticipationState;
+  // Phase 2.7
+  beatSequence?: BeatSequence;
+  emotionalArc?: EmotionalArc;
+  reactionChains?: ReactionChain[];
+  storyAnchors?: StoryAnchor[];
+  sceneEvolution?: SceneEvolution;
+  cinematicMomentScore?: CinematicMomentScore;
 }

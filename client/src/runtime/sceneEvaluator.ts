@@ -1,4 +1,4 @@
-import type { SceneGraph } from '@animaster/shared/scene';
+import type { SceneGraph, EmotionalBeat } from '@animaster/shared/scene';
 import { evaluateProximity } from './proximityAwareness';
 import { evaluateStaging } from './staging/stagingEvaluator';
 import { evaluateReactions } from './acting/reactionTiming';
@@ -29,6 +29,27 @@ import { applyTensionCompression } from './tension/tensionCompression';
 import { buildAnticipation } from './anticipation/anticipationBuilder';
 import { applyPayoffRelease } from './anticipation/payoffRelease';
 import { validateReadability } from './validation/readabilityValidator';
+// Phase 2.7 imports
+import { createBeatSequence } from './beats/beatSequenceTemplates';
+import { advanceBeatSequence } from './beats/beatSequenceRunner';
+import { applyBeatActingEffects } from './beats/beatActingEffects';
+import { applyBeatCameraEffects } from './beats/beatCameraEffects';
+import { applyBeatSpacingEffects } from './beats/beatSpacingEffects';
+import { applyPsychologicalCameraResponse } from './beats/psychologicalCamera';
+import { motivateBeatTiming } from './beats/motivatedTiming';
+import { createEmotionalArc } from './arcs/arcTemplates';
+import { advanceEmotionalArc } from './arcs/arcEvaluator';
+import { applyArcEmotionTransition } from './arcs/arcEmotionTransition';
+import { applyArcAtmosphereShift } from './arcs/arcAtmosphereEffect';
+import { detectReactionTriggers } from './reactions/reactionTriggerDetector';
+import { advanceReactionChain } from './reactions/reactionRunner';
+import { applyReactionCameraEffect } from './reactions/reactionCameraEffects';
+import { selectStoryAnchors } from './anchors/storyAnchorRegistry';
+import { evaluateSceneEvolution } from './evolution/sceneEvolutionEvaluator';
+import { applySpacingEvolution } from './evolution/spacingEvolution';
+import { evolvePacing } from './evolution/pacingEvolution';
+import { evolveCameraIntensity } from './evolution/cameraEvolution';
+import { detectCinematicMoment } from './evolution/cinematicMomentDetector';
 
 let lastActorIds = new Set<string>();
 const TICK_DELTA_MS = 16;
@@ -94,6 +115,60 @@ export function evaluateScene(scene: SceneGraph): SceneGraph {
 
   // Phase 2.6: Readability Validation (non-mutating, diagnostic only)
   validateReadability(scene);
+
+  // Phase 2.7: Beat Sequence Runtime
+  if (!scene.beatSequence) {
+    scene.beatSequence = createBeatSequence(scene.cinematicGrammar.tone, scene.simulation?.timeMs ?? 0);
+  }
+  const { updatedSequence, activeBeat, beatProgress } = advanceBeatSequence(scene.beatSequence, TICK_DELTA_MS);
+  scene.beatSequence = updatedSequence;
+  if (activeBeat) {
+    const motivatedBeat = motivateBeatTiming(activeBeat, scene);
+    scene.actors = scene.actors.map((a) => applyBeatActingEffects(a, motivatedBeat, beatProgress));
+    scene.camera = applyBeatCameraEffects(scene.camera, motivatedBeat, beatProgress);
+    scene.actors = applyBeatSpacingEffects(scene.actors, motivatedBeat, beatProgress);
+    scene.camera = applyPsychologicalCameraResponse(scene.camera, scene.beatSequence, motivatedBeat, beatProgress);
+  }
+
+  // Phase 2.7: Emotional Arc
+  if (!scene.emotionalArc) {
+    scene.emotionalArc = createEmotionalArc(scene.cinematicGrammar.tone);
+  }
+  const { updatedArc, activePhase, phaseProgress } = advanceEmotionalArc(scene.emotionalArc, TICK_DELTA_MS);
+  scene.emotionalArc = updatedArc;
+  if (activePhase) {
+    scene.actors = scene.actors.map((a) => applyArcEmotionTransition(a, activePhase, phaseProgress));
+    scene.atmosphere = applyArcAtmosphereShift(scene.atmosphere, activePhase, phaseProgress);
+  }
+
+  // Phase 2.7: Reaction Chains
+  const newChains = detectReactionTriggers(scene);
+  scene.reactionChains = [...(scene.reactionChains ?? []), ...newChains];
+  scene.reactionChains = scene.reactionChains.map((chain) => {
+    if (chain.completed) return chain;
+    const { updatedChain, activeStep, stepProgress } = advanceReactionChain(chain, TICK_DELTA_MS);
+    if (activeStep) {
+      const stepAsBeat: EmotionalBeat = { action: activeStep.action, durationMs: activeStep.durationMs, elapsedMs: 0, emotionTarget: null, intensityTarget: 0.5, cameraResponse: 'none', spacingDelta: 0, motionDamping: 0 };
+      scene.actors = scene.actors.map((a) => applyBeatActingEffects(a, stepAsBeat, stepProgress));
+      scene.camera = applyReactionCameraEffect(scene.camera, activeStep, stepProgress);
+    }
+    return updatedChain;
+  });
+  scene.reactionChains = scene.reactionChains.filter((c) => !c.completed);
+
+  // Phase 2.7: Story Anchors
+  if (!scene.storyAnchors || scene.storyAnchors.length === 0) {
+    scene.storyAnchors = selectStoryAnchors(scene.cinematicGrammar.tone, scene.environment);
+  }
+
+  // Phase 2.7: Scene Evolution
+  scene.sceneEvolution = evaluateSceneEvolution(scene, TICK_DELTA_MS);
+  scene.actors = applySpacingEvolution(scene.actors, scene);
+  scene.rhythm = evolvePacing(scene);
+  scene.camera = evolveCameraIntensity(scene.camera, scene);
+
+  // Phase 2.7: Cinematic Moment Detection
+  scene.cinematicMomentScore = detectCinematicMoment(scene);
 
   validateContinuity(scene);
   captureSnapshot(scene);

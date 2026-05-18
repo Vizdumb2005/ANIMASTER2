@@ -6,6 +6,7 @@ import { drawRain } from './effects/rain';
 import { drawFog } from './effects/fog';
 import { drawFlicker } from './effects/flicker';
 import { drawLightingTint } from './effects/lightingTint';
+import { drawStoryAnchors } from '../runtime/anchors/storyAnchorRenderer';
 
 function clearLayer(layer: Container) {
   layer.removeChildren();
@@ -66,6 +67,12 @@ export function clearAndRedrawScene({
     }
     drawLightingTint(effectsLayer, width, height, scene.atmosphere.lightingTint);
     backgroundLayer.addChild(effectsLayer);
+  }
+
+  if (scene.storyAnchors && scene.storyAnchors.length > 0) {
+    const anchorLayer = new Container();
+    drawStoryAnchors(anchorLayer, scene.storyAnchors);
+    backgroundLayer.addChild(anchorLayer);
   }
 
   for (const actor of scene.actors) {

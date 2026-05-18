@@ -361,6 +361,49 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     }
   }
 
+  if (/argues?\s+with|confronts?|corners?/i.test(prompt) && scene.actors.length >= 2) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'angry' };
+    scene.actors[1] = { ...scene.actors[1], emotionState: 'angry' };
+    scene.relationships = scene.relationships ?? [];
+    const relIdx = scene.relationships.findIndex((r: { actorAId: string; actorBId: string }) => r.actorAId === scene.actors[0].id && r.actorBId === scene.actors[1].id);
+    if (relIdx >= 0) {
+      scene.relationships[relIdx] = { ...scene.relationships[relIdx], type: 'confronting' };
+    } else {
+      scene.relationships.push({ actorAId: scene.actors[0].id, actorBId: scene.actors[1].id, type: 'confronting', awarenessRadius: 200, gazeTarget: scene.actors[1].id, emotionalReaction: 'angry' });
+    }
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'angry', intensity: 0.8, reason: prompt });
+    scene.cinematicGrammar = { tone: 'threatening', template: { cameraMode: 'tension', spacingMultiplier: 0.6, motionEnergyScale: 0.8, pauseFrequency: 3, contrastBoost: 0.7, headroom: 0.6 } };
+  } else if (/comforts?|consoles?/i.test(prompt) && scene.actors.length >= 2) {
+    scene.actors[0] = { ...scene.actors[0], emotionState: 'sad' };
+    scene.relationships = scene.relationships ?? [];
+    const relIdx = scene.relationships.findIndex((r: { actorAId: string; actorBId: string }) => r.actorAId === scene.actors[0].id && r.actorBId === scene.actors[1].id);
+    if (relIdx >= 0) {
+      scene.relationships[relIdx] = { ...scene.relationships[relIdx], type: 'approaching' };
+    } else {
+      scene.relationships.push({ actorAId: scene.actors[0].id, actorBId: scene.actors[1].id, type: 'approaching', awarenessRadius: 200, gazeTarget: scene.actors[1].id, emotionalReaction: 'sad' });
+    }
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'sad', intensity: 0.6, reason: prompt });
+    scene.cinematicGrammar = { tone: 'sad', template: { cameraMode: 'close_up', spacingMultiplier: 0.5, motionEnergyScale: 0.5, pauseFrequency: 8, contrastBoost: 0.2, headroom: 0.8 } };
+  } else if (/avoids?|ignores?|turns?\s+away/i.test(prompt) && scene.actors.length >= 2) {
+    scene.actors[1] = { ...scene.actors[1], emotionState: 'nervous' };
+    scene.relationships = scene.relationships ?? [];
+    const relIdx = scene.relationships.findIndex((r: { actorAId: string; actorBId: string }) => r.actorAId === scene.actors[0].id && r.actorBId === scene.actors[1].id);
+    if (relIdx >= 0) {
+      scene.relationships[relIdx] = { ...scene.relationships[relIdx], type: 'avoiding' };
+    } else {
+      scene.relationships.push({ actorAId: scene.actors[0].id, actorBId: scene.actors[1].id, type: 'avoiding', awarenessRadius: 200, gazeTarget: null, emotionalReaction: 'nervous' });
+    }
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[1].id, emotion: 'nervous', intensity: 0.6, reason: prompt });
+  } else if (/talks?\s+to|speaks?\s+to|chats?\s+with|converses?\s+with/i.test(prompt) && scene.actors.length >= 2) {
+    scene.relationships = scene.relationships ?? [];
+    const relIdx = scene.relationships.findIndex((r: { actorAId: string; actorBId: string }) => r.actorAId === scene.actors[0].id && r.actorBId === scene.actors[1].id);
+    if (relIdx >= 0) {
+      scene.relationships[relIdx] = { ...scene.relationships[relIdx], type: 'conversing' };
+    } else {
+      scene.relationships.push({ actorAId: scene.actors[0].id, actorBId: scene.actors[1].id, type: 'conversing', awarenessRadius: 200, gazeTarget: scene.actors[1].id, emotionalReaction: null });
+    }
+  }
+
   if (/add\s+(another|a\s+new|a\s+second)\s+(character|stickman|actor|person)/i.test(prompt)) {
     const newId = `actor_${scene.actors.length + 1}`;
     const posX = 800;

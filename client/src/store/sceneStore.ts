@@ -196,6 +196,13 @@ export const sceneStore = {
     draft.powerDynamics = undefined;
     draft.tensionState = undefined;
     draft.anticipationState = undefined;
+    // Phase 2.7 fields — clear so they reinitialize from new tone
+    draft.beatSequence = undefined;
+    draft.emotionalArc = undefined;
+    draft.reactionChains = undefined;
+    draft.storyAnchors = undefined;
+    draft.sceneEvolution = undefined;
+    draft.cinematicMomentScore = undefined;
 
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
