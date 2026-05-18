@@ -159,7 +159,7 @@ export interface CinematicGrammar {
 
 // --- Task 54: Atmosphere Profile ---
 
-export type AtmosphereEffect = 'rain' | 'fog' | 'flicker' | 'dust' | 'none';
+export type AtmosphereEffect = 'rain' | 'fog' | 'flicker' | 'dust' | 'snow' | 'embers' | 'none';
 
 export interface AtmosphereProfile {
   effects: AtmosphereEffect[];
@@ -237,6 +237,22 @@ export interface SemanticMutationRecord {
   prompt: string;
   createdAt: number;
   operations: SemanticMutationOperation[];
+}
+
+// --- Phase 4: Expressive Face System ---
+
+export type EyeShape = 'round' | 'wide' | 'narrow' | 'droopy' | 'half_closed' | 'squint';
+export type MouthShape = 'neutral' | 'smile' | 'frown' | 'tight' | 'grimace' | 'open' | 'crooked';
+
+export interface FaceExpression {
+  eyeShape: EyeShape;
+  browAngle: number;       // -1 (sad/worried) to 1 (angry/determined), 0 = neutral
+  mouthCurve: MouthShape;
+  pupilOffsetX: number;    // -1 to 1 (gaze direction)
+  pupilOffsetY: number;    // -1 to 1 (look up/down)
+  blinkState: number;      // 0 = open, 1 = closed
+  squint: number;          // 0 to 1
+  browAsymmetry: number;   // 0 = symmetric, 1 = full asymmetry (one brow up)
 }
 
 // --- Phase 2.6: Emotional Spatial Intelligence ---

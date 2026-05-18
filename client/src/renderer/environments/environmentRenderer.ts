@@ -1,6 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
-import type { Environment } from '@animaster/shared/scene';
+import type { Camera, Environment } from '@animaster/shared/scene';
 import { getEnvironmentDefinition, type EnvironmentShape } from './environmentRegistry';
+import { getParallaxOffset, applyAtmosphericPerspective } from './parallaxSystem';
 
 function inferTimeOfDay(env: Environment): string {
   const bg = env.backgroundColor.toLowerCase();
@@ -49,7 +50,7 @@ function drawShape(g: Graphics, shape: EnvironmentShape): void {
   }
 }
 
-export function drawEnvironment(layer: Container, env: Environment, width: number, height: number): void {
+export function drawEnvironment(layer: Container, env: Environment, width: number, height: number, camera?: Camera): void {
   const def = getEnvironmentDefinition(env.type);
   if (!def) {
     drawFallbackRoom(layer, env, width, height);
@@ -64,6 +65,16 @@ export function drawEnvironment(layer: Container, env: Environment, width: numbe
     for (const shape of envLayer.shapes) {
       drawShape(g, shape);
     }
+
+    // Phase 4: Apply parallax offset based on camera
+    if (camera) {
+      const offset = getParallaxOffset(envLayer.type, camera);
+      g.position.set(offset.x, offset.y);
+    }
+
+    // Phase 4: Atmospheric perspective for distant layers
+    applyAtmosphericPerspective(g, envLayer.type, width, height);
+
     layer.addChild(g);
   }
 }
