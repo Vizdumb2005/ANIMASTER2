@@ -177,7 +177,7 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const isPark = /park|garden|meadow/i.test(prompt);
   const isBeach = /beach|ocean|sea|shore/i.test(prompt);
   const isForest = /forest|woods|jungle/i.test(prompt);
-  const isStreet = /street|outdoor|lamp|alley|road/i.test(prompt);
+  const isStreet = /street|outdoor|outside|lamp|alley|road/i.test(prompt);
   const isNight = /night|flicker|streetlight/i.test(prompt);
   const isLonely = /lonely|alone|isolated/i.test(prompt);
   const hasFlicker = /flicker|streetlight|lamp/i.test(prompt);

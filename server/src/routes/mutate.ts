@@ -262,7 +262,7 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 3, motionEnergyCurve: 'sharp' };
   }
 
-  if (/add\s+rain|raining|rainy/i.test(prompt)) {
+  if (/rain/i.test(prompt)) {
     const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
     if (!existingEffects.includes('rain')) existingEffects.push('rain');
     scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
