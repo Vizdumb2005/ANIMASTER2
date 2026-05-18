@@ -183,6 +183,12 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const isPark = /park|garden|meadow/i.test(prompt);
   const isBeach = /beach|ocean|sea|shore/i.test(prompt);
   const isForest = /forest|woods|jungle/i.test(prompt);
+  const isRooftop = /rooftop|roof/i.test(prompt);
+  const isHallway = /hallway|corridor/i.test(prompt);
+  const isSubway = /subway|metro|underground|station/i.test(prompt);
+  const isHospital = /hospital|clinic|ward/i.test(prompt);
+  const isApartment = /apartment|flat|home/i.test(prompt);
+  const isStaircase = /staircase|stairs|stairwell/i.test(prompt);
   const isStreet = /street|outdoor|outside|lamp|alley|road/i.test(prompt);
   const isNight = /night|flicker|streetlight/i.test(prompt);
   const isLonely = /lonely|alone|isolated/i.test(prompt);
@@ -193,8 +199,8 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const currentAction = isWalk ? 'walking' : isSit ? 'sitting' : 'idle';
   const actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'> = isWalk && isSit ? ['sitting'] : ['idle'];
 
-  const envType = isPark ? 'outdoor_park' : isBeach ? 'outdoor_beach' : isForest ? 'outdoor_forest' : isStreet ? 'outdoor_street' : 'indoor_room';
-  const roomColor = isPark ? '#1a2e1a' : isBeach ? '#1a3a5a' : isForest ? '#0f1f0f' : isNight ? '#0a0e1a' : isSad ? '#17151f' : isHappy ? '#2d1d12' : '#1b1f24';
+  const envType = isRooftop ? 'rooftop' : isHallway ? 'hallway' : isSubway ? 'subway' : isHospital ? 'hospital' : isApartment ? 'apartment' : isStaircase ? 'staircase' : isPark ? 'outdoor_park' : isBeach ? 'outdoor_beach' : isForest ? 'outdoor_forest' : isStreet ? 'outdoor_street' : 'indoor_room';
+  const roomColor = isRooftop ? '#0a0e1a' : isHallway ? '#0f1218' : isSubway ? '#0a0c12' : isHospital ? '#1a1e24' : isPark ? '#1a2e1a' : isBeach ? '#1a3a5a' : isForest ? '#0f1f0f' : isNight ? '#0a0e1a' : isSad ? '#17151f' : isHappy ? '#2d1d12' : '#1b1f24';
 
   const tone = isLonely ? 'lonely' : isSad ? 'sad' : isNervous ? 'tense' : 'neutral';
   const cameraMode = isLonely ? 'wide_shot' : isSad ? 'wide_shot' : isNervous && hasSecondActor ? 'tension' : 'static';
@@ -278,8 +284,8 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
     environment: {
       type: envType,
       backgroundColor: roomColor,
-      floorColor: isPark ? '#2d4a2d' : isBeach ? '#c2a878' : isForest ? '#1a3a1a' : isNight ? '#0d0f14' : isSad ? '#2d221f' : '#3a2b1f',
-      wallColor: isPark ? '#1f3a1f' : isBeach ? '#2a4a6a' : isForest ? '#0a2a0a' : isNight ? '#111828' : isSad ? '#211c29' : '#2a2228',
+      floorColor: isRooftop ? '#2a2530' : isHallway ? '#1a1620' : isSubway ? '#2a2530' : isHospital ? '#1e2228' : isApartment ? '#2d221f' : isStaircase ? '#1a1620' : isPark ? '#2d4a2d' : isBeach ? '#c2a878' : isForest ? '#1a3a1a' : isNight ? '#0d0f14' : isSad ? '#2d221f' : '#3a2b1f',
+      wallColor: isRooftop ? '#0f1420' : isHallway ? '#1a1822' : isSubway ? '#16141e' : isHospital ? '#202830' : isApartment ? '#211c29' : isStaircase ? '#1a1822' : isPark ? '#1f3a1f' : isBeach ? '#2a4a6a' : isForest ? '#0a2a0a' : isNight ? '#111828' : isSad ? '#211c29' : '#2a2228',
       width: 960,
       height: 540
     },

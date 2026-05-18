@@ -2,17 +2,24 @@ import CanvasView from './components/CanvasView';
 import PromptBar from './components/PromptBar';
 import SessionSidebar from './components/SessionSidebar';
 import DebugPanel from './components/DebugPanel';
+import CinematicControls from './components/CinematicControls';
+import PlaybackControls from './components/PlaybackControls';
+import SceneInfoOverlay from './components/SceneInfoOverlay';
+import BeatTimeline from './components/BeatTimeline';
+import CameraPresets from './components/CameraPresets';
+import ActorDirector from './components/ActorDirector';
+import SceneGraphView from './components/SceneGraphView';
 
 export default function App() {
   return (
     <main className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">Animaster Phase 1</p>
-          <h1>Semantic animation, rendered live.</h1>
+          <p className="eyebrow">Animaster</p>
+          <h1>Direct cinema through language.</h1>
         </div>
         <p className="subtle">
-          A procedural room, a stickman actor, and a runtime loop wired for the vertical slice.
+          Describe a scene. Direct it conversationally. No manual animation.
         </p>
       </header>
 
@@ -20,8 +27,18 @@ export default function App() {
 
       <section className="canvas-frame">
         <CanvasView />
+        <SceneInfoOverlay />
+        <PlaybackControls />
+        <BeatTimeline />
       </section>
 
+      <div className="directing-panel">
+        <CinematicControls />
+        <CameraPresets />
+        <ActorDirector />
+      </div>
+
+      <SceneGraphView />
       <SessionSidebar />
       <DebugPanel />
     </main>

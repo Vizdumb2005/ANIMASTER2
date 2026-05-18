@@ -237,3 +237,479 @@ body {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* Phase 3: Canvas-relative positioning */
+.canvas-frame {
+  position: relative;
+}
+
+/* Phase 3: Prompt Suggestions */
+.prompt-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.suggestion-chip {
+  border: 1px solid rgba(255, 205, 147, 0.25);
+  border-radius: 2rem;
+  padding: 0.3rem 0.75rem;
+  background: rgba(255, 205, 147, 0.06);
+  color: rgba(255, 205, 147, 0.85);
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.suggestion-chip:hover {
+  background: rgba(255, 205, 147, 0.15);
+}
+
+/* Phase 3: Cinematic Controls */
+.directing-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.cinematic-controls-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.6rem;
+  padding: 0.5rem 1rem;
+  background: rgba(14, 17, 24, 0.82);
+  color: rgba(255, 205, 147, 0.92);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cinematic-controls {
+  flex: 0 0 220px;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+}
+
+.cinematic-controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.cinematic-controls-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.85);
+}
+
+.cinematic-controls-close {
+  background: none;
+  border: none;
+  color: rgba(246, 239, 231, 0.5);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.cinematic-slider-group {
+  margin-bottom: 0.5rem;
+}
+
+.cinematic-slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: rgba(246, 239, 231, 0.7);
+  margin-bottom: 0.2rem;
+}
+
+.cinematic-slider-value {
+  color: rgba(255, 205, 147, 0.7);
+  font-size: 0.68rem;
+}
+
+.cinematic-slider-group input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  outline: none;
+}
+
+.cinematic-slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffcc8f;
+  cursor: pointer;
+}
+
+/* Phase 3: Playback Controls */
+.playback-controls {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 2rem;
+  background: rgba(10, 12, 18, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 10;
+}
+
+.playback-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  color: rgba(246, 239, 231, 0.85);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-family: inherit;
+}
+
+.playback-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.playback-reset {
+  color: rgba(255, 205, 147, 0.85);
+  border-color: rgba(255, 205, 147, 0.25);
+}
+
+.speed-selector {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.speed-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.35rem;
+  color: rgba(246, 239, 231, 0.6);
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-family: inherit;
+}
+
+.speed-active {
+  background: rgba(255, 205, 147, 0.15);
+  color: #ffcc8f;
+  border-color: rgba(255, 205, 147, 0.35);
+}
+
+/* Phase 3: Scene Info Overlay */
+.scene-info-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  z-index: 10;
+}
+
+.scene-info-chip {
+  padding: 0.15rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(10, 12, 18, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(246, 239, 231, 0.7);
+}
+
+.scene-info-chip[data-type="tone"] {
+  color: #ffcc8f;
+  border-color: rgba(255, 205, 147, 0.3);
+}
+
+.scene-info-chip[data-type="tension"] {
+  color: #ff948d;
+  border-color: rgba(255, 148, 141, 0.3);
+}
+
+.scene-info-chip[data-type="camera"] {
+  color: #8ab4f8;
+  border-color: rgba(138, 180, 248, 0.3);
+}
+
+/* Phase 3: Beat Timeline */
+.beat-timeline {
+  position: absolute;
+  bottom: 48px;
+  left: 12px;
+  right: 12px;
+  z-index: 10;
+}
+
+.beat-timeline-bar {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.beat-segment {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(0, 0, 0, 0.3);
+  transition: background 0.3s;
+}
+
+.beat-current {
+  background: rgba(255, 205, 147, 0.6);
+}
+
+.beat-past {
+  background: rgba(255, 205, 147, 0.2);
+}
+
+/* Phase 3: Camera Presets */
+.camera-presets {
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+}
+
+.camera-presets-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.85);
+  margin-bottom: 0.4rem;
+}
+
+.camera-presets-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.camera-preset-btn {
+  border: 1px solid rgba(138, 180, 248, 0.2);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(138, 180, 248, 0.06);
+  color: rgba(138, 180, 248, 0.8);
+  font-size: 0.68rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.camera-preset-btn:hover {
+  background: rgba(138, 180, 248, 0.15);
+}
+
+/* Phase 3: Actor Director */
+.actor-director {
+  flex: 1 1 200px;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+}
+
+.actor-director-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.85);
+  margin-bottom: 0.4rem;
+}
+
+.actor-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.actor-chip {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(246, 239, 231, 0.8);
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.actor-selected {
+  background: rgba(255, 205, 147, 0.12);
+  border-color: rgba(255, 205, 147, 0.4);
+  color: #ffcc8f;
+}
+
+.emotion-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.emotion-preset-btn {
+  border: 1px solid rgba(255, 148, 141, 0.2);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  background: rgba(255, 148, 141, 0.06);
+  color: rgba(255, 148, 141, 0.8);
+  font-size: 0.65rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.emotion-preset-btn:hover {
+  background: rgba(255, 148, 141, 0.15);
+}
+
+/* Phase 3: Scene Graph View */
+.scene-graph-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.6rem;
+  padding: 0.5rem 1rem;
+  background: rgba(14, 17, 24, 0.82);
+  color: rgba(255, 205, 147, 0.92);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.scene-graph-panel {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.scene-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.scene-graph-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.85);
+}
+
+.scene-graph-close {
+  background: none;
+  border: none;
+  color: rgba(246, 239, 231, 0.5);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.scene-graph-section {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scene-graph-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.6);
+  margin-bottom: 0.25rem;
+}
+
+.scene-graph-actor {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: rgba(246, 239, 231, 0.8);
+  margin-bottom: 0.15rem;
+}
+
+.actor-name {
+  color: #ffcc8f;
+  font-weight: 600;
+}
+
+.actor-emotion {
+  color: #ff948d;
+}
+
+.actor-action {
+  color: #8ab4f8;
+}
+
+.actor-pos {
+  color: rgba(246, 239, 231, 0.45);
+  font-size: 0.65rem;
+}
+
+.scene-graph-empty {
+  font-size: 0.68rem;
+  color: rgba(246, 239, 231, 0.35);
+  font-style: italic;
+}
+
+.scene-graph-rel {
+  font-size: 0.68rem;
+  color: rgba(246, 239, 231, 0.7);
+}
+
+.scene-graph-metrics {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: rgba(246, 239, 231, 0.7);
+}
+
+.metric-row span:last-child {
+  color: rgba(255, 205, 147, 0.85);
+}
+
+.tension-bar-container {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-top: 0.2rem;
+}
+
+.tension-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffcc8f, #ff948d);
+  transition: width 0.3s ease;
+}
+
+.scene-graph-anchor {
+  font-size: 0.65rem;
+  color: rgba(246, 239, 231, 0.6);
+}

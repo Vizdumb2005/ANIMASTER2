@@ -3,9 +3,10 @@ import { interpretScene } from '../services/interpretService';
 import { mutateScene } from '../services/mutateService';
 import { sceneStore } from '../store/sceneStore';
 import { initActorJoints } from '../runtime/initActorJoints';
+import PromptSuggestions from './PromptSuggestions';
 
 export default function PromptBar() {
-  const [prompt, setPrompt] = useState('A sad stickman walks into a room and sits.');
+  const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,19 +45,20 @@ export default function PromptBar() {
   return (
     <form className="prompt-bar" onSubmit={handleSubmit}>
       <label className="prompt-label" htmlFor="prompt-input">
-        Describe a scene
+        {sceneStore.getScene().version > 0 ? 'Direct the scene' : 'Describe a scene'}
       </label>
+      <PromptSuggestions onSelect={(s) => setPrompt(s)} />
       <div className="prompt-row">
         <input
           id="prompt-input"
           className="prompt-input"
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          placeholder="A sad stickman walks into a room and sits."
+          placeholder="A lonely man waits outside a hospital in the rain at night..."
           spellCheck={false}
         />
         <button className="prompt-button" type="submit" disabled={isLoading}>
-          {isLoading ? 'Interpreting…' : 'Generate'}
+          {isLoading ? 'Creating…' : sceneStore.getScene().version > 0 ? 'Direct' : 'Create Scene'}
         </button>
       </div>
       <p className="prompt-help">
