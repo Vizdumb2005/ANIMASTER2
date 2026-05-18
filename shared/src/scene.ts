@@ -46,6 +46,15 @@ export interface ActingState {
   pauseUntil: number;
 }
 
+export interface EmotionalAftermath {
+  emotion: ActorEmotion;
+  peakIntensity: number;
+  residualIntensity: number;
+  startedAtMs: number;
+  lastUpdatedAtMs: number;
+  recoveryHalfLifeMs: number;
+}
+
 export interface Actor {
   id: string;
   label: string;
@@ -61,6 +70,7 @@ export interface Actor {
   joints: StickmanJoints;
   actingState?: ActingState;
   actionElapsed: number;
+  emotionalMomentum?: number;
 }
 
 export interface Environment {
@@ -205,9 +215,10 @@ export interface ContinuityViolation {
 
 export interface ContinuityState {
   lastValidatedVersion: number;
-  actorSnapshots: Record<string, { position: Vector2; emotionState: ActorEmotion; actionType: ActionType | ActorAction }>;
+  actorSnapshots: Record<string, { position: Vector2; emotionState: ActorEmotion; emotionIntensity: number; actionType: ActionType | ActorAction }>;
   cameraSnapshot: { x: number; y: number; zoom: number; mode: CameraMode } | null;
   violations: ContinuityViolation[];
+  emotionalAftermath?: Record<string, EmotionalAftermath>;
 }
 
 export type SemanticMutationOperation =

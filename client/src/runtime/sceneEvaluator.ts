@@ -50,6 +50,7 @@ import { applySpacingEvolution } from './evolution/spacingEvolution';
 import { evolvePacing } from './evolution/pacingEvolution';
 import { evolveCameraIntensity } from './evolution/cameraEvolution';
 import { detectCinematicMoment } from './evolution/cinematicMomentDetector';
+import { applyEmotionalAftermath } from './continuity/emotionalAftermath';
 
 let lastActorIds = new Set<string>();
 const TICK_DELTA_MS = 16;
@@ -74,6 +75,7 @@ export function evaluateScene(scene: SceneGraph): SceneGraph {
   }
 
   scene.actors = evaluateReactions(scene.actors, scene.relationships ?? []);
+  scene = applyEmotionalAftermath(scene);
 
   // Phase 2.6: Emotional Spatial Intelligence
   scene.emotionalSpatial = resolveSpatialIntent(scene);
