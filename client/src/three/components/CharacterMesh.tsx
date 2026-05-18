@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { Actor, ActorEmotion, StickmanJoints } from '@animaster/shared/scene';
+import type { Actor, ActorEmotion } from '@animaster/shared/scene';
 
 const EMOTION_COLORS: Record<string, number> = {
   neutral: 0xb0a898,
@@ -108,7 +108,9 @@ function Mouth({ emotion }: MouthProps) {
 
   const material = useMemo(() => new THREE.LineBasicMaterial({ color: 0x333333 }), []);
 
-  return <primitive ref={lineRef} object={new THREE.Line(geometry, material)} />;
+  const lineObj = useMemo(() => new THREE.Line(geometry, material), [geometry, material]);
+
+  return <primitive ref={lineRef} object={lineObj} />;
 }
 
 interface CharacterMeshProps {
@@ -123,6 +125,11 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
   const nextBlink = useRef(2.5 + Math.random() * 3);
   const gazeRef = useRef({ x: 0, y: 0 });
   const breathRef = useRef(0);
+  const walkPhase = useRef(0);
+  const leftArmRef = useRef<THREE.Mesh>(null);
+  const rightArmRef = useRef<THREE.Mesh>(null);
+  const leftLegRef = useRef<THREE.Mesh>(null);
+  const rightLegRef = useRef<THREE.Mesh>(null);
 
   const color = EMOTION_COLORS[actor.emotionState] ?? EMOTION_COLORS.neutral;
   const posture = EMOTION_POSTURE[actor.emotionState] ?? EMOTION_POSTURE.neutral;
@@ -167,6 +174,16 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
       gazeRef.current.x *= 0.95;
       gazeRef.current.y *= 0.95;
     }
+
+    // Walking animation via refs
+    if (isWalking) {
+      walkPhase.current += delta * 5;
+    }
+    const wp = walkPhase.current;
+    if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, posture.armAngle + (isWalking ? Math.sin(wp) * 0.3 : 0));
+    if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, -(posture.armAngle + (isWalking ? Math.sin(wp + Math.PI) * 0.3 : 0)));
+    if (leftLegRef.current) leftLegRef.current.rotation.set(isWalking ? Math.sin(wp) * 0.4 : 0, 0, 0);
+    if (rightLegRef.current) rightLegRef.current.rotation.set(isWalking ? Math.sin(wp + Math.PI) * 0.4 : 0, 0, 0);
   });
 
   // Walking animation
@@ -213,8 +230,8 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
 
       {/* Left Arm */}
       <mesh
+        ref={leftArmRef}
         position={[-0.22, 0.85 - posture.shoulderDrop, 0]}
-        rotation={[0, 0, posture.armAngle + (isWalking ? Math.sin(Date.now() * 0.005) * 0.3 : 0)]}
         castShadow
       >
         <capsuleGeometry args={[0.04, 0.35, 4, 6]} />
@@ -223,8 +240,8 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
 
       {/* Right Arm */}
       <mesh
+        ref={rightArmRef}
         position={[0.22, 0.85 - posture.shoulderDrop, 0]}
-        rotation={[0, 0, -(posture.armAngle + (isWalking ? Math.sin(Date.now() * 0.005 + Math.PI) * 0.3 : 0))]}
         castShadow
       >
         <capsuleGeometry args={[0.04, 0.35, 4, 6]} />
@@ -233,8 +250,8 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
 
       {/* Left Leg */}
       <mesh
+        ref={leftLegRef}
         position={[-0.08, 0.3, 0]}
-        rotation={[isWalking ? Math.sin(Date.now() * 0.005) * 0.4 : 0, 0, 0]}
         castShadow
       >
         <capsuleGeometry args={[0.05, 0.35, 4, 6]} />
@@ -243,8 +260,8 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
 
       {/* Right Leg */}
       <mesh
+        ref={rightLegRef}
         position={[0.08, 0.3, 0]}
-        rotation={[isWalking ? Math.sin(Date.now() * 0.005 + Math.PI) * 0.4 : 0, 0, 0]}
         castShadow
       >
         <capsuleGeometry args={[0.05, 0.35, 4, 6]} />

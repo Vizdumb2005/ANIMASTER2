@@ -25,7 +25,9 @@ export default function SceneCameraController({ camera, tone, tensionLevel = 0, 
   const { camera: threeCamera } = useThree();
   const targetPos = useRef(new THREE.Vector3(0, 3, 8));
   const targetLookAt = useRef(new THREE.Vector3(0, 1, 0));
+  const smoothLookAt = useRef(new THREE.Vector3(0, 1, 0));
   const handheldOffset = useRef(new THREE.Vector3());
+  const lerpTarget = useRef(new THREE.Vector3());
 
   const config = TONE_CAMERA_DEFAULTS[tone] ?? TONE_CAMERA_DEFAULTS.neutral;
 
@@ -105,17 +107,12 @@ export default function SceneCameraController({ camera, tone, tensionLevel = 0, 
 
     // Smooth interpolation
     const lerpSpeed = 0.04;
-    perspCam.position.lerp(
-      targetPos.current.clone().add(handheldOffset.current),
-      lerpSpeed
-    );
+    lerpTarget.current.copy(targetPos.current).add(handheldOffset.current);
+    perspCam.position.lerp(lerpTarget.current, lerpSpeed);
 
     // Smooth look-at
-    const currentLookAt = new THREE.Vector3();
-    perspCam.getWorldDirection(currentLookAt);
-    currentLookAt.multiplyScalar(10).add(perspCam.position);
-    currentLookAt.lerp(targetLookAt.current, lerpSpeed);
-    perspCam.lookAt(targetLookAt.current);
+    smoothLookAt.current.lerp(targetLookAt.current, lerpSpeed);
+    perspCam.lookAt(smoothLookAt.current);
 
     // Smooth FOV
     if (Math.abs(perspCam.fov - desiredFov) > 0.1) {
