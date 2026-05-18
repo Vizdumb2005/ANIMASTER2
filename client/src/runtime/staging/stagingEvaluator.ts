@@ -1,20 +1,42 @@
-import type { Actor, SceneGraph, StagingRule } from '@animaster/shared/scene';
-import { getBuiltInStagingRules, applyStagingRule } from './stagingRules';
+import type { Actor, SceneGraph } from '@animaster/shared/scene';
+import type { ToneRuntimeProfile } from '../semanticProfiles';
+import { findAnchor } from '../semanticAnchors';
 
-export function evaluateStaging(scene: SceneGraph): Actor[] {
-  const rules = getBuiltInStagingRules(scene.environment);
-  const actorCount = scene.actors.length;
+export function evaluateStaging(scene: SceneGraph, tone?: ToneRuntimeProfile): Actor[] {
+  const profile = tone ?? {
+    spacingMultiplier: scene.cinematicGrammar?.template?.spacingMultiplier ?? 1,
+    preferredRelationshipDistance: 180,
+    tone: scene.cinematicGrammar?.tone ?? 'neutral',
+    negativeSpace: 1
+  } as ToneRuntimeProfile;
 
-  const matchingRule = rules.find((rule) => {
-    if (rule.condition === 'actorCount === 1' && actorCount === 1) return true;
-    if (rule.condition === 'actorCount === 2' && actorCount === 2) return true;
-    return false;
+  const actors = scene.actors.map((actor) => ({ ...actor }));
+  const hasActiveMovement = actors.some((actor) => {
+    const type = actor.activeAction?.type;
+    return actor.targetPosition || type === 'walkingTo' || type === 'approaching' || type === 'sittingDown' || type === 'seated';
   });
+  if (hasActiveMovement) return actors;
 
-  if (!matchingRule) return scene.actors;
+  const floorY = scene.environment.height * 0.67;
+  const center = findAnchor(scene.anchors, 'center')?.position ?? { x: scene.environment.width / 2, y: floorY };
+  const spacing = profile.preferredRelationshipDistance * profile.spacingMultiplier;
 
-  const hasTargets = scene.actors.some((a) => a.targetPosition !== null);
-  if (hasTargets) return scene.actors;
+  if (actors.length === 1) {
+    const actor = actors[0];
+    const lonelyOffset = profile.tone === 'lonely' ? -scene.environment.width * 0.16 : 0;
+    actor.position = { x: center.x + lonelyOffset, y: center.y };
+    return actors;
+  }
 
-  return applyStagingRule(scene.actors, matchingRule);
+  if (actors.length >= 2) {
+    const left = center.x - spacing / 2;
+    const right = center.x + spacing / 2;
+    actors[0].position = { x: left, y: floorY };
+    actors[1].position = { x: right, y: floorY };
+    for (let i = 2; i < actors.length; i++) {
+      actors[i].position = { x: center.x + (i - 1) * 60, y: floorY };
+    }
+  }
+
+  return actors;
 }

@@ -14,15 +14,20 @@ interface RainDrop {
 let drops: RainDrop[] = [];
 let initialized = false;
 
+function seededUnit(index: number, salt: number) {
+  const x = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 function initDrops(width: number, height: number) {
   drops = [];
   for (let i = 0; i < DROP_COUNT; i++) {
     drops.push({
-      x: Math.random() * (width + 100) - 50,
-      y: Math.random() * height,
-      length: 8 + Math.random() * 7,
-      opacity: 0.3 + Math.random() * 0.4,
-      speed: 4 + Math.random() * 4
+      x: seededUnit(i, 1) * (width + 100) - 50,
+      y: seededUnit(i, 2) * height,
+      length: 8 + seededUnit(i, 3) * 7,
+      opacity: 0.3 + seededUnit(i, 4) * 0.4,
+      speed: 4 + seededUnit(i, 5) * 4
     });
   }
   initialized = true;
@@ -36,13 +41,14 @@ export function drawRain(layer: Container, width: number, height: number, deltaM
   const g = new Graphics();
   const dt = deltaMs / 16;
 
-  for (const drop of drops) {
+  for (let i = 0; i < drops.length; i++) {
+    const drop = drops[i];
     drop.x += Math.cos(ANGLE) * drop.speed * dt;
     drop.y += Math.sin(ANGLE) * drop.speed * dt * 2;
 
     if (drop.y > height) {
       drop.y = -drop.length;
-      drop.x = Math.random() * (width + 100) - 50;
+      drop.x = seededUnit(i, Math.floor(drop.x + drop.y) + 6) * (width + 100) - 50;
     }
 
     const endX = drop.x + Math.cos(ANGLE) * drop.length;

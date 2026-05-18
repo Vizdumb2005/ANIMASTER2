@@ -5,6 +5,10 @@ const HESITATION_MAX = 500;
 
 const actorHesitations = new Map<string, { freezeUntil: number; lastAction: string }>();
 
+function actorHash(actorId: string) {
+  return [...actorId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+}
+
 export function clearHesitationState(actorIds: Set<string>) {
   for (const id of actorHesitations.keys()) {
     if (!actorIds.has(id)) actorHesitations.delete(id);
@@ -15,7 +19,7 @@ export function applyHesitation(actor: Actor): { actor: Actor; frozen: boolean }
   const state = actorHesitations.get(actor.id);
 
   if (state && state.lastAction !== actor.currentAction) {
-    const duration = HESITATION_MIN + Math.random() * (HESITATION_MAX - HESITATION_MIN);
+    const duration = HESITATION_MIN + (actorHash(actor.id) % (HESITATION_MAX - HESITATION_MIN));
     actorHesitations.set(actor.id, {
       freezeUntil: actor.actionElapsed + duration,
       lastAction: actor.currentAction

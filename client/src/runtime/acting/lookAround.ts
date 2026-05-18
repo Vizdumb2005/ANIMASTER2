@@ -1,21 +1,24 @@
 import type { Actor } from '@animaster/shared/scene';
 
-const LOOK_INTERVAL_MIN = 5000;
-const LOOK_INTERVAL_MAX = 12000;
+const LOOK_INTERVAL = 7600;
 const TURN_DURATION = 400;
 const HOLD_DURATION = 600;
 const TURN_AMOUNT = 8;
 
 const actorTimers = new Map<string, { nextLookAt: number; looking: boolean; lookStart: number; direction: number }>();
 
+function actorHash(actorId: string) {
+  return [...actorId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+}
+
 function getTimer(actorId: string, elapsed: number) {
   let timer = actorTimers.get(actorId);
   if (!timer) {
     timer = {
-      nextLookAt: elapsed + LOOK_INTERVAL_MIN + Math.random() * (LOOK_INTERVAL_MAX - LOOK_INTERVAL_MIN),
+      nextLookAt: elapsed + LOOK_INTERVAL + (actorHash(actorId) % 2400),
       looking: false,
       lookStart: 0,
-      direction: Math.random() > 0.5 ? 1 : -1
+      direction: actorHash(actorId) % 2 === 0 ? 1 : -1
     };
     actorTimers.set(actorId, timer);
   }
@@ -43,7 +46,7 @@ export function applyLookAround(actor: Actor): Actor {
 
     if (elapsed >= totalDuration) {
       timer.looking = false;
-      timer.nextLookAt = actor.actionElapsed + LOOK_INTERVAL_MIN + Math.random() * (LOOK_INTERVAL_MAX - LOOK_INTERVAL_MIN);
+      timer.nextLookAt = actor.actionElapsed + LOOK_INTERVAL + (actorHash(actor.id) % 2400);
     } else if (elapsed < TURN_DURATION) {
       const progress = elapsed / TURN_DURATION;
       actor.joints.head.x += Math.sin(progress * Math.PI * 0.5) * TURN_AMOUNT * timer.direction;
