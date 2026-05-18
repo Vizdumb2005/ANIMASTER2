@@ -174,8 +174,11 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const isWalk = /walk|enter/i.test(prompt);
   const isApproach = /approach|comes|walks.*toward|comes.*closer/i.test(prompt);
   const hasSecondActor = /another|second|someone|while.*character|two/i.test(prompt);
-  const isStreet = /street|outside|outdoor|lamp|light/i.test(prompt);
-  const isNight = /night|dark|flicker|streetlight/i.test(prompt);
+  const isPark = /park|garden|meadow/i.test(prompt);
+  const isBeach = /beach|ocean|sea|shore/i.test(prompt);
+  const isForest = /forest|woods|jungle/i.test(prompt);
+  const isStreet = /street|outdoor|outside|lamp|alley|road/i.test(prompt);
+  const isNight = /night|flicker|streetlight/i.test(prompt);
   const isLonely = /lonely|alone|isolated/i.test(prompt);
   const hasFlicker = /flicker|streetlight|lamp/i.test(prompt);
   const hasRain = /rain/i.test(prompt);
@@ -184,8 +187,8 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   const currentAction = isWalk ? 'walking' : isSit ? 'sitting' : 'idle';
   const actionQueue: Array<'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing'> = isWalk && isSit ? ['sitting'] : ['idle'];
 
-  const envType = isStreet ? 'outdoor_street' : 'indoor_room';
-  const roomColor = isNight ? '#0a0e1a' : isSad ? '#17151f' : isHappy ? '#2d1d12' : '#1b1f24';
+  const envType = isPark ? 'outdoor_park' : isBeach ? 'outdoor_beach' : isForest ? 'outdoor_forest' : isStreet ? 'outdoor_street' : 'indoor_room';
+  const roomColor = isPark ? '#1a2e1a' : isBeach ? '#1a3a5a' : isForest ? '#0f1f0f' : isNight ? '#0a0e1a' : isSad ? '#17151f' : isHappy ? '#2d1d12' : '#1b1f24';
 
   const tone = isLonely ? 'lonely' : isSad ? 'sad' : isNervous ? 'tense' : 'neutral';
   const cameraMode = isLonely ? 'wide_shot' : isSad ? 'wide_shot' : isNervous && hasSecondActor ? 'tension' : 'static';
@@ -258,8 +261,8 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
     environment: {
       type: envType,
       backgroundColor: roomColor,
-      floorColor: isNight ? '#0d0f14' : isSad ? '#2d221f' : '#3a2b1f',
-      wallColor: isNight ? '#111828' : isSad ? '#211c29' : '#2a2228',
+      floorColor: isPark ? '#2d4a2d' : isBeach ? '#c2a878' : isForest ? '#1a3a1a' : isNight ? '#0d0f14' : isSad ? '#2d221f' : '#3a2b1f',
+      wallColor: isPark ? '#1f3a1f' : isBeach ? '#2a4a6a' : isForest ? '#0a2a0a' : isNight ? '#111828' : isSad ? '#211c29' : '#2a2228',
       width: 960,
       height: 540
     },
