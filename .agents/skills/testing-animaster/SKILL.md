@@ -1,64 +1,77 @@
 ---
 name: testing-animaster
-description: How to run and test the Animaster app end-to-end, including server/client startup, fallback mode testing, and demo scenario workflows.
+description: How to test Animaster's cinematic runtime systems end-to-end, including Phase 2.6 and 2.7 features.
 ---
 
 # Testing Animaster
 
-## Environment Setup
-
-1. Start the server (port 3001):
-   ```bash
-   cd server && npx tsx src/index.ts
-   ```
-
-2. Start the client (default port 5173, may increment if in use):
-   ```bash
-   cd client && npx vite --host
-   ```
-
-3. If port 3001 is in use from a previous run:
-   ```bash
-   fuser -k 3001/tcp
-   ```
-
-## Testing Mode
-
-The app works in **fallback mode** without an OpenAI API key. The server uses regex-based pattern matching to generate scenes and apply mutations. No credentials are needed for basic E2E testing.
-
-## Key Test Scenarios
-
-### Phase 1 (Tasks 21-33)
-- Scene generation: Type a prompt like "A stickman walks in a room" and click Generate
-- Scene mutation: With an existing scene, type "make the room darker" to mutate
-- Emotion changes: "make the stickman nervous" changes emotionState
-- Add characters: "add another stickman" adds a second actor
-- Debug panel: Ctrl+D toggles SceneGraph JSON overlay
-- Session sidebar: Shows all prompts in chronological order
-
-### Phase 2 (Tasks 34-80)
-- **Demo 1**: "A nervous stickman waits under a flickering streetlight while another character approaches slowly from the distance."
-  - Expect: 2 actors, street environment, flicker effect, nervous emotion, approach behavior
-- **Demo 2**: "Make the scene feel more lonely."
-  - Expect: tone→lonely, camera→wide_shot, lightingTint→cold, tempo→slow (no scene regeneration)
-- **Demo 3**: "Add rain and make the lighting colder."
-  - Expect: Rain particles visible, atmosphere.effects includes "rain", lightingTint "cold"
-- **Demo 4**: "Have the approaching character stop and hesitate."
-  - Expect: Approaching actor stops (currentAction→idle)
-
-## Verification via Debug Panel
-
-Press **Ctrl+D** to open the debug panel. Key Phase 2 fields to verify:
-- `cinematicGrammar.tone` — should match inferred scene tone
-- `atmosphere.effects` — array of active effects (rain, flicker, fog, etc.)
-- `atmosphere.lightingTint` — warm, cold, night, or rgba value
-- `relationships` — array of actor relationships
-- `rhythm.tempo` — slow, medium, or fast
-- `camera.mode` — static, follow, close_up, wide_shot, over_the_shoulder, dramatic_zoom, tension
-
-## TypeScript Checks
-
+## Starting the App
 ```bash
-npx tsc -p client/tsconfig.json --noEmit
-npx tsc -p server/tsconfig.json --noEmit
+# Server (port 3001)
+cd server && npm run dev
+
+# Client (port 5173)
+cd client && npm run dev
 ```
+
+## Debug Panel
+- Toggle with `Ctrl+D` — shows live SceneGraph JSON
+- Key Phase 2.7 fields to verify: `beatSequence`, `emotionalArc`, `storyAnchors`, `sceneEvolution`, `cinematicMomentScore`
+- Key Phase 2.6 fields: `emotionalSpatial`, `shotIntent`, `tensionState`, `anticipationState`, `powerDynamics`, `compositionMetrics`
+
+## Extracting Data via Playwright CDP
+The debug panel JSON is large. Use Playwright CDP for efficient extraction:
+```python
+from playwright.sync_api import sync_playwright
+import json, time
+
+with sync_playwright() as p:
+    browser = p.chromium.connect_over_cdp('http://localhost:29229')
+    ctx = browser.contexts[0]
+    page = next((pg for pg in ctx.pages if 'localhost:5173' in pg.url), ctx.pages[0])
+    time.sleep(1)  # Wait for HMR to settle
+    result = page.evaluate("""() => {
+        const pre = document.querySelector('pre');
+        if (!pre) return null;
+        const data = JSON.parse(pre.textContent);
+        return {
+            tone: data.cinematicGrammar?.tone,
+            beatLabel: data.beatSequence?.label,
+            beatIndex: data.beatSequence?.currentIndex,
+            arcLabel: data.emotionalArc?.label,
+            storyAnchorsCount: data.storyAnchors?.length ?? 0,
+            momentScore: data.cinematicMomentScore?.overallScore,
+            actorCount: data.actors?.length ?? 0,
+            emotions: (data.actors || []).map(a => a.emotionState),
+            relTypes: (data.relationships || []).map(r => r.type)
+        };
+    }""")
+    print(json.dumps(result, indent=2))
+    browser.close()
+```
+
+**Note**: Vite HMR can cause "Execution context was destroyed" errors. Add `time.sleep(1)` before queries and wrap in retry loops (3 attempts).
+
+## Test Scenarios
+
+### Phase 2.7 Beat Runtime
+1. **Beat progression**: Enter "A nervous stickman stands alone", verify `beatSequence.currentIndex` advances and `totalElapsedMs` increases
+2. **Emotional arc**: Verify `emotionalArc` has 5 phases, `currentPhaseIndex` advances over ~10s
+3. **Story anchors**: Verify `storyAnchors` array populated with bench/window/streetlight/doorway types
+4. **Scene evolution**: Verify `sceneEvolution.sampleCount` increases, trajectory arrays fill up
+5. **Cinematic moment score**: Verify all scores between 0-1
+
+### Relational Parsing
+6. **Confronts**: "A stickman confronts another stickman" → 2 actors, `confronting` relationship
+7. **Comforts**: "A stickman comforts a sad stickman" → 2 actors, `approaching` relationship, `sad` tone
+
+### Mutation
+8. **State reset**: After mutation (e.g. "make it lonely"), Phase 2.7 fields reinitialize with new tone
+
+### Console Errors
+9. Check browser console — expect 0 uncaught errors from Phase 2.7 modules. WebGL driver messages and favicon 404 are non-critical.
+
+## Known Issues
+- No OpenAI API key configured — all testing uses fallback regex engine
+- "confronts" prompt may produce tone=`neutral` instead of `threatening` due to emotion regex priority in fallback
+- Playwright CDP connections can break due to Vite HMR — use retry loops
