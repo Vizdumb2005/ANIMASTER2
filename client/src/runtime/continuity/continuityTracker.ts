@@ -1,65 +1,44 @@
-import type { Actor, SceneGraph, CharacterRelationship } from '@animaster/shared/scene';
+import type { SceneGraph, ContinuityViolation } from '@animaster/shared/scene';
 
-interface ContinuitySnapshot {
-  actorPositions: Map<string, { x: number; y: number }>;
-  actorEmotions: Map<string, string>;
-  relationships: CharacterRelationship[];
-  version: number;
-}
-
-let lastSnapshot: ContinuitySnapshot | null = null;
-
-export function captureSnapshot(scene: SceneGraph): ContinuitySnapshot {
-  const positions = new Map<string, { x: number; y: number }>();
-  const emotions = new Map<string, string>();
-
+export function captureSnapshot(scene: SceneGraph) {
+  scene.continuity ??= { lastValidatedVersion: scene.version, actorSnapshots: {}, cameraSnapshot: null, violations: [] };
+  const actorSnapshots: NonNullable<SceneGraph['continuity']>['actorSnapshots'] = {};
   for (const actor of scene.actors) {
-    positions.set(actor.id, { x: actor.position.x, y: actor.position.y });
-    emotions.set(actor.id, actor.emotionState);
+    actorSnapshots[actor.id] = {
+      position: { ...actor.position },
+      emotionState: actor.emotionState,
+      actionType: actor.activeAction?.type ?? actor.currentAction
+    };
   }
-
-  const snapshot: ContinuitySnapshot = {
-    actorPositions: positions,
-    actorEmotions: emotions,
-    relationships: scene.relationships ? [...scene.relationships] : [],
-    version: scene.version
-  };
-
-  lastSnapshot = snapshot;
-  return snapshot;
+  scene.continuity.actorSnapshots = actorSnapshots;
+  scene.continuity.cameraSnapshot = { x: scene.camera.x, y: scene.camera.y, zoom: scene.camera.zoom, mode: scene.camera.mode };
+  scene.continuity.lastValidatedVersion = scene.version;
+  return scene.continuity;
 }
 
-export function getLastSnapshot(): ContinuitySnapshot | null {
-  return lastSnapshot;
-}
-
-export interface ContinuityViolation {
-  actorId: string;
-  field: string;
-  expected: string;
-  actual: string;
+export function getLastSnapshot(scene?: SceneGraph) {
+  return scene?.continuity ?? null;
 }
 
 export function validateContinuity(scene: SceneGraph): ContinuityViolation[] {
-  if (!lastSnapshot) return [];
-
+  scene.continuity ??= { lastValidatedVersion: scene.version, actorSnapshots: {}, cameraSnapshot: null, violations: [] };
+  const previous = scene.continuity.actorSnapshots;
   const violations: ContinuityViolation[] = [];
 
   for (const actor of scene.actors) {
-    const prevPos = lastSnapshot.actorPositions.get(actor.id);
-    if (prevPos) {
-      const dx = Math.abs(actor.position.x - prevPos.x);
-      const dy = Math.abs(actor.position.y - prevPos.y);
-      if (dx > 300 || dy > 300) {
-        violations.push({
-          actorId: actor.id,
-          field: 'position',
-          expected: `near (${prevPos.x}, ${prevPos.y})`,
-          actual: `(${actor.position.x}, ${actor.position.y})`
-        });
-      }
+    const prev = previous[actor.id];
+    if (!prev) continue;
+    const dx = actor.position.x - prev.position.x;
+    const dy = actor.position.y - prev.position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 300) {
+      violations.push({ id: `spatial_${actor.id}`, severity: 'error', field: 'position', message: `${actor.id} moved ${Math.round(dist)}px without a transition`, repairApplied: false });
+    }
+    if (prev.actionType !== (actor.activeAction?.type ?? actor.currentAction) && actor.activeAction?.interruptible === false && actor.activeAction.status !== 'complete') {
+      violations.push({ id: `action_${actor.id}`, severity: 'warning', field: 'activeAction', message: `${actor.id} changed non-interruptible action`, repairApplied: false });
     }
   }
 
+  scene.continuity.violations = violations;
   return violations;
 }

@@ -1,6 +1,7 @@
 import type { Actor, CharacterRelationship } from '@animaster/shared/scene';
+import type { ToneRuntimeProfile } from './semanticProfiles';
 
-export function evaluateProximity(actors: Actor[], relationships: CharacterRelationship[]): CharacterRelationship[] {
+export function evaluateProximity(actors: Actor[], relationships: CharacterRelationship[], tone?: ToneRuntimeProfile): CharacterRelationship[] {
   const updated: CharacterRelationship[] = [];
 
   for (let i = 0; i < actors.length; i++) {
@@ -15,8 +16,10 @@ export function evaluateProximity(actors: Actor[], relationships: CharacterRelat
         (r) => (r.actorAId === a.id && r.actorBId === b.id) || (r.actorAId === b.id && r.actorBId === a.id)
       );
 
-      const awarenessRadius = existing?.awarenessRadius ?? 200;
+      const preferredDistance = existing?.preferredDistance ?? tone?.preferredRelationshipDistance ?? 180;
+      const awarenessRadius = existing?.awarenessRadius ?? Math.max(200, preferredDistance * 1.2);
       const isAware = dist <= awarenessRadius;
+      const tension = existing?.tension ?? (dist < preferredDistance * 0.75 ? 0.75 : dist > preferredDistance * 1.5 ? 0.15 : 0.35);
 
       updated.push({
         actorAId: a.id,
@@ -24,7 +27,9 @@ export function evaluateProximity(actors: Actor[], relationships: CharacterRelat
         type: existing?.type ?? (isAware ? 'approaching' : 'stranger'),
         awarenessRadius,
         gazeTarget: isAware ? b.id : (existing?.gazeTarget ?? null),
-        emotionalReaction: existing?.emotionalReaction ?? null
+        emotionalReaction: existing?.emotionalReaction ?? null,
+        preferredDistance,
+        tension
       });
     }
   }

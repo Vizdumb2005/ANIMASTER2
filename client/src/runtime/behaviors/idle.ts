@@ -2,7 +2,7 @@ import { Actor } from '@animaster/shared/scene';
 import { initActorJoints } from '../initActorJoints';
 
 export function evaluateIdle(actor: Actor, deltaMs: number): Actor {
-  if (actor.actionQueue.length > 0) {
+  if (!actor.activeAction && actor.actionQueue.length > 0) {
     actor.currentAction = actor.actionQueue.shift()!;
     actor.actionElapsed = 0;
     return actor;

@@ -139,6 +139,18 @@ export const sceneMutationResponseSchema = {
         pauseFrequencyPerMinute: { type: 'number' },
         motionEnergyCurve: { enum: ['linear', 'ease-in', 'ease-out', 'sharp'] }
       }
+    },
+    semanticOperations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: true,
+        required: ['type', 'reason'],
+        properties: {
+          type: { enum: ['SetTone', 'AdjustLighting', 'AddAtmosphere', 'QueueActorAction', 'SetActorEmotion', 'RestageScene', 'MoveActorToAnchor', 'AdjustRelationship', 'FocusCameraOn'] },
+          reason: { type: 'string' }
+        }
+      }
     }
   },
   $defs: {
@@ -163,6 +175,7 @@ Return a COMPLETE scene patch that reflects the requested change.
 Rules:
 - Output JSON only. No markdown wrappers.
 - The response must contain actors, environment, camera, cinematicGrammar, atmosphere, relationships, and rhythm fields.
+- Also include semanticOperations when an edit has executable meaning; these operations are the preferred runtime mutation contract.
 - Preserve ALL existing actors, their positions, actions, and states unless the edit explicitly changes them.
 - When the user says "make the room darker" or similar lighting edits, darken the environment colors but keep all actors unchanged.
 - When the user says "make him nervous" or similar emotion edits, change only the referenced actor's emotionState. Valid emotions: neutral, sad, happy, nervous, excited, awkward, angry, exhausted.
@@ -206,7 +219,7 @@ Examples:
    → Darken backgroundColor, floorColor, wallColor. Keep all actors and other fields as they are.
 
 2. Edit: "Make the scene feel more lonely."
-   → Set cinematicGrammar.tone to 'lonely', template.cameraMode to 'wide_shot', increase spacingMultiplier, decrease motionEnergyScale, set atmosphere.lightingTint to 'cold', increase rhythm.pauseFrequencyPerMinute.
+   → Include semanticOperations [{ type: 'SetTone', tone: 'lonely', reason: edit }, { type: 'AdjustLighting', tint: 'cold', reason: edit }], set cinematicGrammar.tone to 'lonely', template.cameraMode to 'wide_shot', increase spacingMultiplier, decrease motionEnergyScale, set atmosphere.lightingTint to 'cold', increase rhythm.pauseFrequencyPerMinute.
 
 3. Edit: "Add rain and make the lighting colder."
    → Add 'rain' to atmosphere.effects, set atmosphere.lightingTint to 'cold'. Keep actors unchanged.

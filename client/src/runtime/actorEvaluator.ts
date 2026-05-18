@@ -1,39 +1,25 @@
 import { Actor, SceneGraph } from '@animaster/shared/scene';
 import { evaluateIdle } from './behaviors/idle';
-import { evaluateWalk } from './behaviors/walk';
-import { evaluateSit } from './behaviors/sit';
-import { evaluateApproach } from './behaviors/approach';
-import { evaluatePace } from './behaviors/pace';
 import { applyEmotionModifier } from './emotions/emotionModifier';
-import { applyWeightShift } from './acting/weightShift';
-import { applyLookAround } from './acting/lookAround';
 import { orientActorTowardTarget } from './proximityAwareness';
+import { getRhythmRuntimeProfile, getToneRuntimeProfile } from './semanticProfiles';
+import { evaluateActionRuntime } from './actionRuntime';
+import { evaluateActingScheduler } from './acting/actingScheduler';
 
 export function evaluateActor(actor: Actor, deltaMs: number, scene: SceneGraph): Actor {
   let nextActor = structuredClone(actor);
   nextActor.actionElapsed += deltaMs;
 
-  switch (nextActor.currentAction) {
-    case 'walking':
-      nextActor = evaluateWalk(nextActor, deltaMs, scene);
-      break;
-    case 'sitting':
-      nextActor = evaluateSit(nextActor, deltaMs);
-      break;
-    case 'approaching':
-      nextActor = evaluateApproach(nextActor, deltaMs, scene);
-      break;
-    case 'pacing':
-      nextActor = evaluatePace(nextActor, deltaMs);
-      break;
-    default:
-      nextActor = evaluateIdle(nextActor, deltaMs);
-      nextActor = applyWeightShift(nextActor);
-      nextActor = applyLookAround(nextActor);
-      break;
+  const tone = getToneRuntimeProfile(scene);
+  const rhythm = getRhythmRuntimeProfile(scene);
+  nextActor = evaluateActionRuntime(nextActor, scene, deltaMs, tone, rhythm);
+
+  if (nextActor.currentAction === 'idle' || nextActor.activeAction?.type === 'waiting') {
+    nextActor = evaluateIdle(nextActor, deltaMs);
   }
 
   nextActor = applyEmotionModifier(nextActor, deltaMs);
+  nextActor = evaluateActingScheduler(nextActor, scene, tone, rhythm);
   nextActor = orientActorTowardTarget(nextActor, scene.actors, scene.relationships ?? []);
   return nextActor;
 }

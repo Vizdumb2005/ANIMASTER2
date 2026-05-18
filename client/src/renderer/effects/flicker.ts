@@ -1,11 +1,11 @@
 import { Container, Graphics } from 'pixi.js';
 
-let randomOffset = Math.random() * 100;
+const randomOffset = 37.25;
 
 export function drawFlicker(layer: Container, x: number, y: number, elapsed: number) {
-  const base = Math.sin(elapsed * 0.012 + randomOffset) * 0.15 + 0.85;
-  const fullFlicker = Math.random() < 0.005 ? 0.3 : base;
-  const brightness = Math.max(0, Math.min(1, fullFlicker));
+  const pulse = Math.sin(elapsed * 0.012 + randomOffset) * 0.15 + 0.85;
+  const dropout = Math.sin(elapsed * 0.047 + 3.1) > 0.994 ? 0.3 : pulse;
+  const brightness = Math.max(0, Math.min(1, dropout));
 
   const radius = 60;
   const g = new Graphics();
@@ -21,5 +21,5 @@ export function drawFlicker(layer: Container, x: number, y: number, elapsed: num
 }
 
 export function resetFlicker() {
-  randomOffset = Math.random() * 100;
+  // Deterministic flicker has no mutable random state to reset.
 }

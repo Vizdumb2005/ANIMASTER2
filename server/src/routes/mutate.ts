@@ -76,6 +76,7 @@ type ScenePatch = {
     pauseFrequencyPerMinute: number;
     motionEnergyCurve: string;
   };
+  semanticOperations?: Array<Record<string, unknown>>;
 };
 
 const router = Router();
@@ -178,10 +179,12 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     },
     atmosphere: currentScene.atmosphere ?? { effects: ['none'], lightingTint: 'rgba(0,0,0,0)', ambientIntensity: 1.0 },
     relationships: currentScene.relationships ?? [],
-    rhythm: currentScene.rhythm ?? { tempo: 'medium', pauseFrequencyPerMinute: 4, motionEnergyCurve: 'linear' }
+    rhythm: currentScene.rhythm ?? { tempo: 'medium', pauseFrequencyPerMinute: 4, motionEnergyCurve: 'linear' },
+    semanticOperations: []
   };
 
   if (/darker|dim/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'night', ambientIntensity: 0.55, reason: prompt });
     scene.environment = {
       ...scene.environment,
       backgroundColor: '#0d0b14',
@@ -189,6 +192,7 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
       wallColor: '#17131d'
     };
   } else if (/warmer|warm/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'warm', reason: prompt });
     scene.environment = {
       ...scene.environment,
       backgroundColor: '#2d1d12',
@@ -196,6 +200,7 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
       wallColor: '#2a1e15'
     };
   } else if (/brighter|bright|lighter/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'rgba(0,0,0,0)', ambientIntensity: 1.15, reason: prompt });
     scene.environment = {
       ...scene.environment,
       backgroundColor: '#2a2535',
@@ -206,31 +211,42 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
 
   if (/nervous|anxious/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'nervous' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'nervous', intensity: 1, reason: prompt });
   } else if (/sad|depressed/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'sad' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'sad', intensity: 1, reason: prompt });
   } else if (/happy|cheerful/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'happy' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'happy', intensity: 1, reason: prompt });
   } else if (/excited|thrilled/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'excited' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'excited', intensity: 1, reason: prompt });
   } else if (/angry|furious/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'angry' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'angry', intensity: 1, reason: prompt });
   } else if (/exhausted|tired/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'exhausted' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'exhausted', intensity: 1, reason: prompt });
   } else if (/awkward/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'awkward' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'awkward', intensity: 1, reason: prompt });
   } else if (/neutral|calm/i.test(prompt) && scene.actors.length > 0) {
     scene.actors[0] = { ...scene.actors[0], emotionState: 'neutral' };
+    scene.semanticOperations?.push({ type: 'SetActorEmotion', actorId: scene.actors[0].id, emotion: 'neutral', intensity: 0, reason: prompt });
   }
 
   if (/lonely|more\s+lonely|lonelier/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'SetTone', tone: 'lonely', reason: prompt });
     scene.cinematicGrammar = {
       tone: 'lonely',
       template: { cameraMode: 'wide_shot', spacingMultiplier: 1.8, motionEnergyScale: 0.6, pauseFrequency: 8, contrastBoost: 0.2, headroom: 1.4 }
     };
     scene.camera = { ...scene.camera, mode: 'wide_shot' };
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'cold', reason: prompt });
     scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 8, motionEnergyCurve: 'ease-out' };
   } else if (/tense|tenser|more\s+tense/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'SetTone', tone: 'tense', reason: prompt });
     scene.cinematicGrammar = {
       tone: 'tense',
       template: { cameraMode: 'close_up', spacingMultiplier: 0.7, motionEnergyScale: 1.2, pauseFrequency: 2, contrastBoost: 0.5, headroom: 0.7 }
@@ -238,14 +254,17 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     scene.camera = { ...scene.camera, mode: 'close_up' };
     scene.rhythm = { tempo: 'medium', pauseFrequencyPerMinute: 2, motionEnergyCurve: 'sharp' };
   } else if (/romantic|love|intimate/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'SetTone', tone: 'romantic', reason: prompt });
     scene.cinematicGrammar = {
       tone: 'romantic',
       template: { cameraMode: 'close_up', spacingMultiplier: 0.5, motionEnergyScale: 0.7, pauseFrequency: 6, contrastBoost: 0.3, headroom: 0.8 }
     };
     scene.camera = { ...scene.camera, mode: 'close_up' };
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'warm' };
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'warm', reason: prompt });
     scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 6, motionEnergyCurve: 'ease-out' };
   } else if (/energetic|fast|chaotic/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'SetTone', tone: 'energetic', reason: prompt });
     scene.cinematicGrammar = {
       tone: 'energetic',
       template: { cameraMode: 'follow', spacingMultiplier: 1.0, motionEnergyScale: 1.5, pauseFrequency: 1, contrastBoost: 0.4, headroom: 0.9 }
@@ -253,41 +272,49 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     scene.camera = { ...scene.camera, mode: 'follow' };
     scene.rhythm = { tempo: 'fast', pauseFrequencyPerMinute: 1, motionEnergyCurve: 'sharp' };
   } else if (/threatening|danger|menacing/i.test(prompt)) {
+    scene.semanticOperations?.push({ type: 'SetTone', tone: 'threatening', reason: prompt });
     scene.cinematicGrammar = {
       tone: 'threatening',
       template: { cameraMode: 'dramatic_zoom', spacingMultiplier: 0.6, motionEnergyScale: 0.8, pauseFrequency: 3, contrastBoost: 0.7, headroom: 0.6 }
     };
     scene.camera = { ...scene.camera, mode: 'dramatic_zoom' };
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'cold', reason: prompt });
     scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 3, motionEnergyCurve: 'sharp' };
   }
 
   if (/rain/i.test(prompt)) {
     const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
     if (!existingEffects.includes('rain')) existingEffects.push('rain');
+    scene.semanticOperations?.push({ type: 'AddAtmosphere', effect: 'rain', reason: prompt });
     scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
   }
 
   if (/add\s+fog|foggy/i.test(prompt)) {
     const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
     if (!existingEffects.includes('fog')) existingEffects.push('fog');
+    scene.semanticOperations?.push({ type: 'AddAtmosphere', effect: 'fog', reason: prompt });
     scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
   }
 
   if (/add\s+flicker|flickering/i.test(prompt)) {
     const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
     if (!existingEffects.includes('flicker')) existingEffects.push('flicker');
+    scene.semanticOperations?.push({ type: 'AddAtmosphere', effect: 'flicker', reason: prompt });
     scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
   }
 
   if (/cold|colder/i.test(prompt) && /light/i.test(prompt)) {
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'cold', reason: prompt });
   } else if (/warm|warmer/i.test(prompt) && /light/i.test(prompt)) {
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'warm' };
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'warm', reason: prompt });
   }
 
   if (/night|nighttime/i.test(prompt)) {
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'night', ambientIntensity: 0.4 };
+    scene.semanticOperations?.push({ type: 'AdjustLighting', tint: 'night', ambientIntensity: 0.4, reason: prompt });
   }
 
   if (/park|garden|forest|outdoor|outside/i.test(prompt)) {
@@ -325,6 +352,12 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
         targetPosition: null,
         actionQueue: []
       };
+      scene.semanticOperations?.push({
+        type: 'QueueActorAction',
+        actorId: scene.actors[approachingIdx].id,
+        action: { id: `action_hesitate_${scene.actors[approachingIdx].id}`, type: 'hesitating', target: null, semanticReason: prompt, phase: 'queued', startedAt: 0, duration: 600, priority: 3, interruptible: true, status: 'queued' },
+        reason: prompt
+      });
     }
   }
 
@@ -366,7 +399,8 @@ function normalizePatch(patch: ScenePatch, currentScene: ScenePatch): ScenePatch
     cinematicGrammar: patch.cinematicGrammar ?? currentScene.cinematicGrammar,
     atmosphere: patch.atmosphere ?? currentScene.atmosphere,
     relationships: Array.isArray(patch.relationships) ? patch.relationships : currentScene.relationships,
-    rhythm: patch.rhythm ?? currentScene.rhythm
+    rhythm: patch.rhythm ?? currentScene.rhythm,
+    semanticOperations: Array.isArray(patch.semanticOperations) ? patch.semanticOperations : []
   };
 }
 
