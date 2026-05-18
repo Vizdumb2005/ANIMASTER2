@@ -25,28 +25,35 @@ const EMOTION_POSTURE: Record<string, { headTilt: number; shoulderDrop: number; 
   excited: { headTilt: 0.12, shoulderDrop: -0.08, lean: 0.05, armAngle: 0.4 },
 };
 
+interface EyeRef {
+  eyeWhite: THREE.Mesh | null;
+  pupil: THREE.Mesh | null;
+}
+
 interface EyeProps {
   position: [number, number, number];
   emotion: ActorEmotion;
-  blinkPhase: number;
-  gazeX: number;
-  gazeY: number;
+  eyeRef: React.MutableRefObject<EyeRef>;
 }
 
-function Eye({ position, emotion, blinkPhase, gazeX, gazeY }: EyeProps) {
-  const scaleY = blinkPhase > 0.8 ? 0.1 : 1;
+function Eye({ position, emotion, eyeRef }: EyeProps) {
+  const eyeWhiteRef = useRef<THREE.Mesh>(null);
+  const pupilRef = useRef<THREE.Mesh>(null);
   const eyeSize = emotion === 'nervous' || emotion === 'excited' ? 0.065 : 0.055;
   const pupilSize = emotion === 'angry' ? 0.02 : 0.03;
 
+  useFrame(() => {
+    eyeRef.current.eyeWhite = eyeWhiteRef.current;
+    eyeRef.current.pupil = pupilRef.current;
+  });
+
   return (
     <group position={position}>
-      {/* Eye white */}
-      <mesh scale={[1, scaleY, 1]}>
+      <mesh ref={eyeWhiteRef}>
         <sphereGeometry args={[eyeSize, 8, 6]} />
         <meshStandardMaterial color={0xdddddd} roughness={0.3} />
       </mesh>
-      {/* Pupil */}
-      <mesh position={[gazeX * 0.025, gazeY * 0.02 * scaleY, 0.04]} scale={[1, scaleY, 1]}>
+      <mesh ref={pupilRef} position={[0, 0, 0.04]}>
         <sphereGeometry args={[pupilSize, 6, 4]} />
         <meshStandardMaterial color={0x111111} roughness={0.5} />
       </mesh>
@@ -130,6 +137,8 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
   const rightArmRef = useRef<THREE.Mesh>(null);
   const leftLegRef = useRef<THREE.Mesh>(null);
   const rightLegRef = useRef<THREE.Mesh>(null);
+  const leftEyeRef = useRef<EyeRef>({ eyeWhite: null, pupil: null });
+  const rightEyeRef = useRef<EyeRef>({ eyeWhite: null, pupil: null });
 
   const color = EMOTION_COLORS[actor.emotionState] ?? EMOTION_COLORS.neutral;
   const posture = EMOTION_POSTURE[actor.emotionState] ?? EMOTION_POSTURE.neutral;
@@ -175,6 +184,18 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
       gazeRef.current.y *= 0.95;
     }
 
+    // Eye blink/gaze via imperative refs
+    const scaleY = blinkPhase.current > 0.8 ? 0.1 : 1;
+    const gx = gazeRef.current.x;
+    const gy = gazeRef.current.y;
+    for (const eye of [leftEyeRef.current, rightEyeRef.current]) {
+      if (eye.eyeWhite) eye.eyeWhite.scale.set(1, scaleY, 1);
+      if (eye.pupil) {
+        eye.pupil.position.set(gx * 0.025, gy * 0.02 * scaleY, 0.04);
+        eye.pupil.scale.set(1, scaleY, 1);
+      }
+    }
+
     // Walking animation via refs
     if (isWalking) {
       walkPhase.current += delta * 5;
@@ -209,16 +230,12 @@ export default function CharacterMesh({ actor, index }: CharacterMeshProps) {
           <Eye
             position={[-0.055, 0.03, 0]}
             emotion={actor.emotionState}
-            blinkPhase={blinkPhase.current}
-            gazeX={gazeRef.current.x}
-            gazeY={gazeRef.current.y}
+            eyeRef={leftEyeRef}
           />
           <Eye
             position={[0.055, 0.03, 0]}
             emotion={actor.emotionState}
-            blinkPhase={blinkPhase.current}
-            gazeX={gazeRef.current.x}
-            gazeY={gazeRef.current.y}
+            eyeRef={rightEyeRef}
           />
           <Brow position={[-0.055, 0.09, 0]} emotion={actor.emotionState} side="left" />
           <Brow position={[0.055, 0.09, 0]} emotion={actor.emotionState} side="right" />

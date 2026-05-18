@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AtmosphereEffect } from '@animaster/shared/scene';
@@ -13,7 +13,7 @@ interface ParticleFieldProps {
   opacity: number;
 }
 
-function ParticleField({ count, color, size, speed, spread, direction, opacity }: ParticleFieldProps) {
+const ParticleField = memo(function ParticleField({ count, color, size, speed, spread, direction, opacity }: ParticleFieldProps) {
   const meshRef = useRef<THREE.Points>(null);
 
   const [positions, velocities] = useMemo(() => {
@@ -31,13 +31,15 @@ function ParticleField({ count, color, size, speed, spread, direction, opacity }
     }
 
     return [pos, vel];
-  }, [count, spread, direction]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count, spread[0], spread[1], spread[2], direction[0], direction[1], direction[2]]);
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
     return geo;
-  }, [positions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count]);
 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
@@ -78,7 +80,7 @@ function ParticleField({ count, color, size, speed, spread, direction, opacity }
       />
     </points>
   );
-}
+});
 
 // Fog bands - horizontal fog layers
 function FogBands() {
