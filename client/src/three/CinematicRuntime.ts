@@ -116,6 +116,7 @@ export class CinematicRuntime {
     }
 
     if (envType !== this.currentEnvironment) {
+    if (envType !== this.currentEnvironment) {
       this.currentEnvironment = envType;
       this.sceneManager.clearLayer('environment');
       this.sceneManager.clearLayer('background');
@@ -142,6 +143,7 @@ export class CinematicRuntime {
         const skyMesh = new THREE.Mesh(skyGeom, skyMat);
         this.sceneManager.layers.background.add(skyMesh);
       }
+
 
       this.audioManager.applyEnvironment(envType);
     }
