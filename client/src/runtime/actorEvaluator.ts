@@ -9,6 +9,9 @@ import { evaluateActingScheduler } from './acting/actingScheduler';
 import { evaluateDeepActing, applyDeepActing } from './acting/deepActingEvaluator';
 import { applyPostureTransition } from './acting/postureTransition';
 import { applyNervousRepetition } from './acting/nervousRepetition';
+// Phase 2.7 pose language
+import { applyPoseWithTransition } from './poses/poseResolver';
+import { applyBeatPoseOverride } from './poses/beatPoseOverrides';
 
 let actorTickCounters = new Map<string, number>();
 
@@ -37,6 +40,14 @@ export function evaluateActor(actor: Actor, deltaMs: number, scene: SceneGraph):
   nextActor = applyPostureTransition(nextActor, deepState, tick);
   if (deepState.nervousRepetitionCount > 0) {
     nextActor = applyNervousRepetition(nextActor, tick, deepState.nervousRepetitionCount);
+  }
+
+  // Phase 2.7: Pose Language
+  nextActor = applyPoseWithTransition(nextActor, deltaMs);
+  const activeBeat = scene.beatSequence?.beats[scene.beatSequence.currentIndex];
+  if (activeBeat) {
+    const beatProgress = activeBeat.durationMs > 0 ? Math.min(activeBeat.elapsedMs / activeBeat.durationMs, 1) : 0;
+    nextActor = applyBeatPoseOverride(nextActor, activeBeat.action, beatProgress);
   }
 
   return nextActor;

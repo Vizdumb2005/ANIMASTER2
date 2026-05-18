@@ -3,6 +3,8 @@ import { initActorJoints } from '../runtime/initActorJoints';
 import { resetSceneEvaluator } from '../runtime/sceneEvaluator';
 import { createDefaultAnchors } from '../runtime/semanticAnchors';
 import { applySemanticOperations, ensureSemanticRuntimeState } from '../runtime/semanticOperations';
+import { resetPoseTransitions } from '../runtime/poses/poseResolver';
+import { resetArcAtmosphereCache } from '../runtime/arcs/arcAtmosphereEffect';
 
 type SceneListener = (scene: SceneGraph) => void;
 
@@ -196,6 +198,15 @@ export const sceneStore = {
     draft.powerDynamics = undefined;
     draft.tensionState = undefined;
     draft.anticipationState = undefined;
+    // Phase 2.7 fields — clear so they reinitialize from new tone
+    resetPoseTransitions();
+    resetArcAtmosphereCache();
+    draft.beatSequence = undefined;
+    draft.emotionalArc = undefined;
+    draft.reactionChains = undefined;
+    draft.storyAnchors = undefined;
+    draft.sceneEvolution = undefined;
+    draft.cinematicMomentScore = undefined;
 
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
