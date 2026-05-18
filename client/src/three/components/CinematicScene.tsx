@@ -86,7 +86,7 @@ export default function CinematicScene() {
         <SceneLighting tone={tone} tensionLevel={tensionLevel} />
 
         {/* Procedural environment */}
-        <EnvironmentMesh envType={envType} tone={tone} />
+        <EnvironmentMesh envType={envType} tone={tone} worldLayout={scene.worldLayout} visualStyle={scene.visualStyle} />
 
         {/* Environmental storytelling props */}
         <SceneProps envType={envType} tone={tone} />

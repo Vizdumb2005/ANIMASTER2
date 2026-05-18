@@ -462,6 +462,84 @@ export interface CinematicMomentScore {
   overallScore: number;
 }
 
+// --- Phase 6: Procedural Semantic World Generation ---
+
+export type LocationType = 'subway' | 'alley' | 'rooftop' | 'forest' | 'beach' | 'apartment' | 'hallway' | 'hospital' | 'parking_garage' | 'diner' | 'office' | 'warehouse' | 'indoor_room' | 'outdoor_street' | 'outdoor_park' | 'outdoor_beach' | 'outdoor_forest' | 'staircase';
+export type TimeOfDay = 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night' | 'late_night';
+export type WeatherType = 'clear' | 'rain' | 'snow' | 'fog' | 'overcast' | 'storm';
+export type LayoutStyle = 'open_space' | 'long_corridor' | 'enclosed_room' | 'split_level' | 'circular' | 'asymmetric';
+export type VisualDensity = 'sparse' | 'moderate' | 'dense' | 'cluttered';
+export type LightingLanguage = 'warm_practical' | 'cold_fluorescent' | 'neon_glow' | 'natural_soft' | 'harsh_overhead' | 'dramatic_spot' | 'moonlit' | 'candlelit';
+export type CompositionStyle = 'negative_space' | 'centered_isolation' | 'asymmetric_tension' | 'foreground_obstruction' | 'depth_layering' | 'silhouette_framing';
+export type CameraLanguage = 'slow_isolation' | 'tight_tension' | 'wide_establishing' | 'handheld_anxiety' | 'steady_observe' | 'drift_melancholy';
+export type VisualStyleName = 'noir' | 'soft_dream' | 'cold_realism' | 'neon_isolation' | 'warm_memory' | 'monochrome_tension' | 'default';
+
+export interface SemanticWorldPlan {
+  locationType: LocationType;
+  timeOfDay: TimeOfDay;
+  tone: SceneTone;
+  weather: WeatherType;
+  layoutStyle: LayoutStyle;
+  visualDensity: VisualDensity;
+  lightingLanguage: LightingLanguage;
+  compositionStyle: CompositionStyle;
+  cameraLanguage: CameraLanguage;
+  keyProps: string[];
+  visualStyle?: VisualStyleName;
+  emotionalEnergy: number;
+}
+
+export interface CompositionZone {
+  id: string;
+  type: 'foreground' | 'midground' | 'background' | 'negative_space' | 'framing';
+  bounds: { xMin: number; xMax: number; zMin: number; zMax: number };
+  visualWeight: number;
+  depth: number;
+}
+
+export interface ProceduralProp {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+  rotation?: number;
+  scale?: number;
+  tags: string[];
+  lightEmit?: boolean;
+  lightColor?: number;
+  lightIntensity?: number;
+}
+
+export interface WorldLayout {
+  zones: CompositionZone[];
+  props: ProceduralProp[];
+  depthLayers: number;
+  groundVariation: string;
+  skylineType: string;
+  fogLayers: number;
+}
+
+export interface VisualStyleProfile {
+  name: VisualStyleName;
+  fogDensity: number;
+  fogColor: number;
+  bloomIntensity: number;
+  bloomThreshold: number;
+  vignetteStrength: number;
+  contrastBoost: number;
+  saturation: number;
+  colorTint: number;
+  grainIntensity: number;
+  silhouetteEnhance: number;
+}
+
+export interface EnvironmentCinematicInfluence {
+  cameraDistanceMultiplier: number;
+  spacingCompression: number;
+  tensionBias: number;
+  pacingMultiplier: number;
+  verticalFramingBias: number;
+}
+
 // --- Scene Graph (expanded) ---
 
 export interface SceneGraph {
@@ -503,4 +581,9 @@ export interface SceneGraph {
     ambientIntensityDelta: number;
     emptinessLevel: number;
   };
+  // Phase 6
+  worldPlan?: SemanticWorldPlan;
+  worldLayout?: WorldLayout;
+  visualStyle?: VisualStyleProfile;
+  environmentInfluence?: EnvironmentCinematicInfluence;
 }
