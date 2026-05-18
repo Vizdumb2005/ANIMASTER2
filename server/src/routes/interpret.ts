@@ -276,7 +276,7 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
       {
         id: 'session_entry_1',
         prompt,
-        createdAt: 0
+        createdAt: Date.now()
       }
     ],
     cinematicGrammar: {
