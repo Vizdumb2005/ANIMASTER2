@@ -106,6 +106,8 @@ export class CinematicRuntime {
         this.cameraController.setSmoothing(camSettings.smoothing);
         if (camSettings.handheld > 0) {
           this.cameraController.setRig('handheld');
+        if (camSettings.handheld > 0) {
+          this.cameraController.setRig('handheld');
         } else {
           this.cameraController.setRig('static');
         }
