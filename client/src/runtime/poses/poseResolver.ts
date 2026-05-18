@@ -27,6 +27,10 @@ export function applyPoseProfile(actor: Actor, profile: PoseProfile, intensity: 
 
 const previousEmotions = new Map<string, { emotion: string; transitionProgress: number }>();
 
+export function resetPoseTransitions(): void {
+  previousEmotions.clear();
+}
+
 export function applyPoseWithTransition(actor: Actor, deltaMs: number): Actor {
   const prev = previousEmotions.get(actor.id);
   const intensity = actor.emotionIntensity ?? 0.5;
@@ -38,7 +42,9 @@ export function applyPoseWithTransition(actor: Actor, deltaMs: number): Actor {
   }
 
   const transitionSpeed = 0.002;
-  const newProgress = Math.min(prev.transitionProgress + deltaMs * transitionSpeed, 1);
+  const isNewTransition = prev.transitionProgress >= 1;
+  const baseProgress = isNewTransition ? 0 : prev.transitionProgress;
+  const newProgress = Math.min(baseProgress + deltaMs * transitionSpeed, 1);
   previousEmotions.set(actor.id, { emotion: newProgress >= 1 ? actor.emotionState : prev.emotion, transitionProgress: newProgress >= 1 ? 1 : newProgress });
 
   const fromProfile = getPoseProfile(prev.emotion as Actor['emotionState']);
