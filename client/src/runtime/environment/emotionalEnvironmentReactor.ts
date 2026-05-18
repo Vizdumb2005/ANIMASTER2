@@ -58,8 +58,8 @@ export function reactEnvironmentToEmotion(scene: SceneGraph): EnvironmentReactio
   return { suggestedEffects, lightingShift, ambientIntensityDelta, emptinessLevel };
 }
 
-export function applyEnvironmentReaction(scene: SceneGraph, reaction: EnvironmentReaction): SceneGraph {
-  if (!scene.atmosphere) return scene;
+export function applyEnvironmentReaction(scene: SceneGraph, reaction: EnvironmentReaction): void {
+  if (!scene.atmosphere) return;
 
   const existingEffects: AtmosphereEffect[] = scene.atmosphere.effects.filter((e): e is AtmosphereEffect => e !== 'none');
   for (const effect of reaction.suggestedEffects) {
@@ -69,16 +69,12 @@ export function applyEnvironmentReaction(scene: SceneGraph, reaction: Environmen
     }
   }
 
-  const finalEffects: AtmosphereEffect[] = existingEffects.length > 0 ? existingEffects : ['none'];
-  const updatedAtmosphere = {
-    ...scene.atmosphere,
-    effects: finalEffects,
-    ambientIntensity: Math.max(0.2, Math.min(1.2, scene.atmosphere.ambientIntensity + reaction.ambientIntensityDelta))
-  };
+  scene.atmosphere.effects = existingEffects.length > 0 ? existingEffects : ['none'];
+  scene.atmosphere.ambientIntensity = Math.max(0.2, Math.min(1.2, scene.atmosphere.ambientIntensity + reaction.ambientIntensityDelta));
 
   if (reaction.lightingShift && scene.atmosphere.lightingTint === 'rgba(0,0,0,0)') {
-    updatedAtmosphere.lightingTint = reaction.lightingShift;
+    scene.atmosphere.lightingTint = reaction.lightingShift;
   }
 
-  return { ...scene, atmosphere: updatedAtmosphere, environmentReaction: reaction };
+  scene.environmentReaction = reaction;
 }

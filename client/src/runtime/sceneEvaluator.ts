@@ -176,7 +176,7 @@ export function evaluateScene(scene: SceneGraph): SceneGraph {
 
   // Phase 3: Emotional Environment Reactor
   const envReaction = reactEnvironmentToEmotion(scene);
-  scene = applyEnvironmentReaction(scene, envReaction);
+  applyEnvironmentReaction(scene, envReaction);
 
   validateContinuity(scene);
   captureSnapshot(scene);

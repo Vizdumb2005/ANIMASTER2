@@ -210,6 +210,8 @@ export const sceneStore = {
     draft.storyAnchors = undefined;
     draft.sceneEvolution = undefined;
     draft.cinematicMomentScore = undefined;
+    // Phase 3 fields — clear so they recompute from new tone
+    draft.environmentReaction = undefined;
 
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
