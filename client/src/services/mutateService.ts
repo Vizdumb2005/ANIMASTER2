@@ -18,7 +18,11 @@ export async function mutateScene(prompt: string, currentScene: SceneGraph): Pro
         currentScene: {
           actors: currentScene.actors,
           environment: currentScene.environment,
-          camera: currentScene.camera
+          camera: currentScene.camera,
+          cinematicGrammar: currentScene.cinematicGrammar,
+          atmosphere: currentScene.atmosphere,
+          relationships: currentScene.relationships,
+          rhythm: currentScene.rhythm
         }
       }),
       signal: controller.signal
