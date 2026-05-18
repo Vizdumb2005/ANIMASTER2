@@ -1,4 +1,4 @@
-import CanvasView from './components/CanvasView';
+import CinematicScene from './three/components/CinematicScene';
 import PromptBar from './components/PromptBar';
 import SessionSidebar from './components/SessionSidebar';
 import DebugPanel from './components/DebugPanel';
@@ -26,7 +26,7 @@ export default function App() {
       <PromptBar />
 
       <section className="canvas-frame">
-        <CanvasView />
+        <CinematicScene />
         <SceneInfoOverlay />
         <PlaybackControls />
         <BeatTimeline />
