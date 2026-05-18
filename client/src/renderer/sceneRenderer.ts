@@ -160,6 +160,11 @@ export function clearAndRedrawScene({
   drawProps(propsLayer, envType, tone, elapsedTotal);
   backgroundLayer.addChild(propsLayer);
 
+  // Phase 4: Ground reflections (for indoor/rainy scenes) — drawn on actorLayer BEFORE actors
+  const hasRain = scene.atmosphere?.effects?.includes('rain') ?? false;
+  const floorY = height * 0.62;
+  drawGroundReflections(actorLayer, scene.actors, floorY, !outdoor, hasRain);
+
   // Draw actors with rim lighting + expressive faces
   for (const actor of scene.actors) {
     drawRimLighting(actorLayer, actor, tone, tensionLevel);
@@ -206,13 +211,6 @@ export function clearAndRedrawScene({
 
   drawFilmGrain(overlayLayer, width, height, elapsedTotal);
   uiLayer.addChild(overlayLayer);
-
-  // Phase 4: Ground reflections (for indoor/rainy scenes)
-  const hasRain = scene.atmosphere?.effects?.includes('rain') ?? false;
-  const floorY = height * 0.62;
-  const reflectionLayer = new Container();
-  drawGroundReflections(reflectionLayer, scene.actors, floorY, !outdoor, hasRain);
-  uiLayer.addChild(reflectionLayer);
 
   drawUiLayer(uiLayer, scene);
 }
