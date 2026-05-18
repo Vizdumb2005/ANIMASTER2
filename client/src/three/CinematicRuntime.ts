@@ -106,6 +106,8 @@ export class CinematicRuntime {
         this.cameraController.setSmoothing(camSettings.smoothing);
         if (camSettings.handheld > 0) {
           this.cameraController.setRig('handheld');
+        } else {
+          this.cameraController.setRig('static');
         }
       }
 
@@ -116,6 +118,7 @@ export class CinematicRuntime {
     if (envType !== this.currentEnvironment) {
       this.currentEnvironment = envType;
       this.sceneManager.clearLayer('environment');
+      this.sceneManager.clearLayer('background');
       const envGroup = this.environmentBuilder.build(envType);
       this.sceneManager.layers.environment.add(envGroup);
 
