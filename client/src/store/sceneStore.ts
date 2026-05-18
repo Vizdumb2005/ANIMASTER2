@@ -192,26 +192,38 @@ export const sceneStore = {
       draft.rhythm = deepMerge(draft.rhythm, patch.rhythm);
     }
 
-    // Phase 2.6 fields are computed at runtime — clear them so they recompute
-    draft.emotionalSpatial = undefined;
-    draft.dramaticBeats = undefined;
-    draft.shotIntent = undefined;
-    draft.attentionFocus = undefined;
-    draft.compositionMetrics = undefined;
-    draft.powerDynamics = undefined;
-    draft.tensionState = undefined;
-    draft.anticipationState = undefined;
-    // Phase 2.7 fields — clear so they reinitialize from new tone
-    resetPoseTransitions();
-    resetArcAtmosphereCache();
-    draft.beatSequence = undefined;
-    draft.emotionalArc = undefined;
-    draft.reactionChains = undefined;
-    draft.storyAnchors = undefined;
-    draft.sceneEvolution = undefined;
-    draft.cinematicMomentScore = undefined;
-    // Phase 3 fields — clear so they recompute from new tone
-    draft.environmentReaction = undefined;
+    const hasMeaningfulChanges = !!(
+      patch.environment ||
+      patch.camera ||
+      patch.cinematicGrammar ||
+      patch.atmosphere ||
+      patch.rhythm ||
+      Array.isArray(patch.actors) ||
+      Array.isArray(patch.relationships)
+    );
+
+    if (hasMeaningfulChanges) {
+      // Phase 2.6 fields are computed at runtime — clear them so they recompute
+      draft.emotionalSpatial = undefined;
+      draft.dramaticBeats = undefined;
+      draft.shotIntent = undefined;
+      draft.attentionFocus = undefined;
+      draft.compositionMetrics = undefined;
+      draft.powerDynamics = undefined;
+      draft.tensionState = undefined;
+      draft.anticipationState = undefined;
+      // Phase 2.7 fields — clear so they reinitialize from new tone
+      resetPoseTransitions();
+      resetArcAtmosphereCache();
+      draft.beatSequence = undefined;
+      draft.emotionalArc = undefined;
+      draft.reactionChains = undefined;
+      draft.storyAnchors = undefined;
+      draft.sceneEvolution = undefined;
+      draft.cinematicMomentScore = undefined;
+      // Phase 3 fields — clear so they recompute from new tone
+      draft.environmentReaction = undefined;
+    }
 
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
