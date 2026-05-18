@@ -51,6 +51,8 @@ import { evolvePacing } from './evolution/pacingEvolution';
 import { evolveCameraIntensity } from './evolution/cameraEvolution';
 import { detectCinematicMoment } from './evolution/cinematicMomentDetector';
 import { applyEmotionalAftermath } from './continuity/emotionalAftermath';
+// Phase 3 imports
+import { reactEnvironmentToEmotion, applyEnvironmentReaction } from './environment/emotionalEnvironmentReactor';
 
 let lastActorIds = new Set<string>();
 const TICK_DELTA_MS = 16;
@@ -171,6 +173,10 @@ export function evaluateScene(scene: SceneGraph): SceneGraph {
 
   // Phase 2.7: Cinematic Moment Detection
   scene.cinematicMomentScore = detectCinematicMoment(scene);
+
+  // Phase 3: Emotional Environment Reactor
+  const envReaction = reactEnvironmentToEmotion(scene);
+  scene = applyEnvironmentReaction(scene, envReaction);
 
   validateContinuity(scene);
   captureSnapshot(scene);

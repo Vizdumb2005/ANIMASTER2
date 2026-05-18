@@ -54,11 +54,16 @@ export default function CanvasView() {
       redraw();
 
       stopLoop = startTickLoop((deltaMs) => {
+        if (sceneStore.isPaused()) {
+          redraw(0);
+          return;
+        }
+        const scaledDelta = deltaMs * sceneStore.getPlaybackSpeed();
         sceneStore.mutateScene((scene) => {
-          scene.actors = scene.actors.map((actor) => evaluateActor(actor, deltaMs, scene));
+          scene.actors = scene.actors.map((actor) => evaluateActor(actor, scaledDelta, scene));
           evaluateScene(scene);
         });
-        redraw(deltaMs);
+        redraw(scaledDelta);
       });
     };
 

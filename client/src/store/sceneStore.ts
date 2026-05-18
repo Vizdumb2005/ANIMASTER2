@@ -8,6 +8,9 @@ import { resetArcAtmosphereCache } from '../runtime/arcs/arcAtmosphereEffect';
 
 type SceneListener = (scene: SceneGraph) => void;
 
+let isPaused = false;
+let playbackSpeed = 1;
+
 function createDefaultScene(): SceneGraph {
   const environment: Environment = {
     type: 'indoor_room',
@@ -230,6 +233,32 @@ export const sceneStore = {
       draft.simulation.timeMs += draft.simulation.fixedDeltaMs;
     }
     currentScene = draft;
+    notify();
+  },
+
+  setPaused(paused: boolean) {
+    isPaused = paused;
+  },
+
+  isPaused(): boolean {
+    return isPaused;
+  },
+
+  setPlaybackSpeed(speed: number) {
+    playbackSpeed = speed;
+  },
+
+  getPlaybackSpeed(): number {
+    return playbackSpeed;
+  },
+
+  resetScene() {
+    resetSceneEvaluator();
+    resetPoseTransitions();
+    resetArcAtmosphereCache();
+    currentScene = createDefaultScene();
+    isPaused = false;
+    playbackSpeed = 1;
     notify();
   },
 

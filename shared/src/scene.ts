@@ -480,4 +480,11 @@ export interface SceneGraph {
   storyAnchors?: StoryAnchor[];
   sceneEvolution?: SceneEvolution;
   cinematicMomentScore?: CinematicMomentScore;
+  // Phase 3
+  environmentReaction?: {
+    suggestedEffects: string[];
+    lightingShift: string | null;
+    ambientIntensityDelta: number;
+    emptinessLevel: number;
+  };
 }
