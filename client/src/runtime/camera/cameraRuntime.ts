@@ -1,7 +1,7 @@
 import type { CameraMode, SceneGraph } from '@animaster/shared/scene';
 import type { RhythmRuntimeProfile, ToneRuntimeProfile } from '../semanticProfiles';
 
-export function evaluateCameraRuntime(scene: SceneGraph, width = scene.environment.width, height = scene.environment.height, tone: ToneRuntimeProfile, rhythm: RhythmRuntimeProfile) {
+export function evaluateCameraRuntime(scene: SceneGraph, width: number, height: number, tone: ToneRuntimeProfile, rhythm: RhythmRuntimeProfile) {
   const subjects = resolveSubjects(scene);
   const mode: CameraMode = scene.camera.plan?.mode ?? scene.camera.mode ?? tone.cameraMode;
   scene.camera.mode = mode;
