@@ -204,7 +204,6 @@ export const sceneStore = {
       }
     ];
 
-    ensureSemanticRuntimeState(draft);
     if (draft.simulation) {
       draft.simulation.tick += 1;
       draft.simulation.timeMs += draft.simulation.fixedDeltaMs;
