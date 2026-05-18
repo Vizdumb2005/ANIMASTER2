@@ -11,6 +11,10 @@ type MutateRequestBody = {
     actors: unknown[];
     environment: unknown;
     camera: unknown;
+    cinematicGrammar?: unknown;
+    atmosphere?: unknown;
+    relationships?: unknown;
+    rhythm?: unknown;
   };
 };
 
@@ -233,16 +237,83 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): ScenePat
     };
     scene.camera = { ...scene.camera, mode: 'close_up' };
     scene.rhythm = { tempo: 'medium', pauseFrequencyPerMinute: 2, motionEnergyCurve: 'sharp' };
+  } else if (/romantic|love|intimate/i.test(prompt)) {
+    scene.cinematicGrammar = {
+      tone: 'romantic',
+      template: { cameraMode: 'close_up', spacingMultiplier: 0.5, motionEnergyScale: 0.7, pauseFrequency: 6, contrastBoost: 0.3, headroom: 0.8 }
+    };
+    scene.camera = { ...scene.camera, mode: 'close_up' };
+    scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'warm' };
+    scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 6, motionEnergyCurve: 'ease-out' };
+  } else if (/energetic|fast|chaotic/i.test(prompt)) {
+    scene.cinematicGrammar = {
+      tone: 'energetic',
+      template: { cameraMode: 'follow', spacingMultiplier: 1.0, motionEnergyScale: 1.5, pauseFrequency: 1, contrastBoost: 0.4, headroom: 0.9 }
+    };
+    scene.camera = { ...scene.camera, mode: 'follow' };
+    scene.rhythm = { tempo: 'fast', pauseFrequencyPerMinute: 1, motionEnergyCurve: 'sharp' };
+  } else if (/threatening|danger|menacing/i.test(prompt)) {
+    scene.cinematicGrammar = {
+      tone: 'threatening',
+      template: { cameraMode: 'dramatic_zoom', spacingMultiplier: 0.6, motionEnergyScale: 0.8, pauseFrequency: 3, contrastBoost: 0.7, headroom: 0.6 }
+    };
+    scene.camera = { ...scene.camera, mode: 'dramatic_zoom' };
+    scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+    scene.rhythm = { tempo: 'slow', pauseFrequencyPerMinute: 3, motionEnergyCurve: 'sharp' };
   }
 
-  if (/add\s+rain|rain/i.test(prompt)) {
+  if (/add\s+rain|raining|rainy/i.test(prompt)) {
     const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
-    existingEffects.push('rain');
+    if (!existingEffects.includes('rain')) existingEffects.push('rain');
+    scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
+  }
+
+  if (/add\s+fog|foggy/i.test(prompt)) {
+    const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
+    if (!existingEffects.includes('fog')) existingEffects.push('fog');
+    scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
+  }
+
+  if (/add\s+flicker|flickering/i.test(prompt)) {
+    const existingEffects = scene.atmosphere?.effects?.filter((e: string) => e !== 'none') ?? [];
+    if (!existingEffects.includes('flicker')) existingEffects.push('flicker');
     scene.atmosphere = { ...scene.atmosphere!, effects: existingEffects };
   }
 
   if (/cold|colder/i.test(prompt) && /light/i.test(prompt)) {
     scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'cold' };
+  } else if (/warm|warmer/i.test(prompt) && /light/i.test(prompt)) {
+    scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'warm' };
+  }
+
+  if (/night|nighttime/i.test(prompt)) {
+    scene.atmosphere = { ...scene.atmosphere!, lightingTint: 'night', ambientIntensity: 0.4 };
+  }
+
+  if (/park|garden|forest|outdoor|outside/i.test(prompt)) {
+    scene.environment = {
+      ...scene.environment,
+      type: 'outdoor_park',
+      backgroundColor: '#1a2e1a',
+      floorColor: '#2d4a2d',
+      wallColor: '#1f3a1f'
+    };
+  } else if (/street|road|alley/i.test(prompt)) {
+    scene.environment = {
+      ...scene.environment,
+      type: 'outdoor_street',
+      backgroundColor: '#0a0e1a',
+      floorColor: '#1a1a2a',
+      wallColor: '#111828'
+    };
+  } else if (/beach|ocean|sea/i.test(prompt)) {
+    scene.environment = {
+      ...scene.environment,
+      type: 'outdoor_beach',
+      backgroundColor: '#1a3a5a',
+      floorColor: '#c2a878',
+      wallColor: '#2a4a6a'
+    };
   }
 
   if (/stop|hesitate/i.test(prompt) && scene.actors.length > 1) {
@@ -291,7 +362,11 @@ function normalizePatch(patch: ScenePatch, currentScene: ScenePatch): ScenePatch
       ? patch.actors
       : (Array.isArray(currentScene.actors) ? currentScene.actors : []),
     environment: patch.environment ?? currentScene.environment,
-    camera: patch.camera ?? currentScene.camera
+    camera: patch.camera ?? currentScene.camera,
+    cinematicGrammar: patch.cinematicGrammar ?? currentScene.cinematicGrammar,
+    atmosphere: patch.atmosphere ?? currentScene.atmosphere,
+    relationships: Array.isArray(patch.relationships) ? patch.relationships : currentScene.relationships,
+    rhythm: patch.rhythm ?? currentScene.rhythm
   };
 }
 
