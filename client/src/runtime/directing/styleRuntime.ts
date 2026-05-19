@@ -1,7 +1,7 @@
 // Directorial Style Runtime Integration
 // Connects DirectorialStyleSelector to runtime atmosphere/camera with smooth transitions
 
-import { sceneStore } from '../store/sceneStore';
+import { sceneStore } from '../../store/sceneStore';
 import type { DirectorialStyle, DirectorialStyleName } from '@animaster/shared/directorialStyles';
 
 interface StyleTransitionState {

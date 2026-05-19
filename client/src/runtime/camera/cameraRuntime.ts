@@ -1,6 +1,6 @@
 import type { CameraMode, SceneGraph } from '@animaster/shared/scene';
 import type { RhythmRuntimeProfile, ToneRuntimeProfile } from '../semanticProfiles';
-import { sceneStore } from '../store/sceneStore';
+import { sceneStore } from '../../store/sceneStore';
 import type { ShotDefinition } from '@animaster/shared/cinematicShots';
 
 export function evaluateCameraRuntime(scene: SceneGraph, width: number, height: number, tone: ToneRuntimeProfile, rhythm: RhythmRuntimeProfile) {
