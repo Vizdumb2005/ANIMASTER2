@@ -36,7 +36,7 @@ export default function DirectorMode() {
     const parsed = parseDirectorCommand(trimmed, scene);
     const effect = applyLiveMutation(parsed, scene);
 
-    setHistory((prev) => [...prev.slice(-19), { cmd: trimmed, effect }]);
+    setHistory((prev) => [...prev.slice(-18), { cmd: trimmed, effect }]);
     setCommand('');
   }, [command, scene]);
 
