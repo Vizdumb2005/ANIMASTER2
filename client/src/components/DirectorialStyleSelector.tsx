@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { sceneStore } from '../store/sceneStore';
 import type { SceneGraph } from '@animaster/shared/scene';
 import { DIRECTORIAL_STYLES, type DirectorialStyle, type DirectorialStyleName } from '@animaster/shared/directorialStyles';
+import { applyStyleWithTransition, getCurrentStyleName } from '../runtime/directing/styleRuntime';
 
 export default function DirectorialStyleSelector() {
   const [scene, setScene] = useState<SceneGraph>(sceneStore.getScene());
@@ -10,8 +11,20 @@ export default function DirectorialStyleSelector() {
 
   useEffect(() => sceneStore.onSceneChange(setScene), []);
 
+  // Initialize active style from scene
+  useEffect(() => {
+    const sceneStyle = scene.visualStyle?.name;
+    if (sceneStyle) {
+      setActiveStyle(sceneStyle as DirectorialStyleName);
+    }
+  }, []);
+
   const applyStyle = useCallback((style: DirectorialStyle) => {
     setActiveStyle(style.name);
+    
+    // Apply with runtime integration
+    applyStyleWithTransition(style);
+    
     sceneStore.mutateScene((draft) => {
       // Apply lighting
       draft.atmosphere.lightingTint = style.lighting.tint;
@@ -33,6 +46,7 @@ export default function DirectorialStyleSelector() {
         draft.visualStyle.grainIntensity = style.atmosphere.grainIntensity;
         draft.visualStyle.saturation = style.colorLanguage.saturation;
         draft.visualStyle.contrastBoost = style.lighting.contrastBoost;
+        draft.visualStyle.name = style.name;
       }
 
       // Apply cinematic grammar energy

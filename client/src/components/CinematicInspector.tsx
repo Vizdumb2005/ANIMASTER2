@@ -46,7 +46,7 @@ export default function CinematicInspector() {
   return (
     <div className="cinematic-inspector">
       <div className="inspector-header">
-        <span className="inspector-title">Cinematic Inspector</span>
+        <span className="inspector-title">Scene Monitor</span>
         <button className="inspector-close" onClick={() => setOpen(false)}>x</button>
       </div>
 
@@ -65,15 +65,15 @@ export default function CinematicInspector() {
             <span className="inspector-value">{Math.round(tension * 100)}%</span>
           </div>
           <div className="inspector-row">
-            <span className="inspector-label">Moment Score</span>
+            <span className="inspector-label">Dramatic Impact</span>
             <span className="inspector-value">{Math.round(momentScore * 100)}%</span>
           </div>
         </section>
 
         <section className="inspector-section">
-          <h4>Pacing & Rhythm</h4>
+          <h4>Rhythm & Pacing</h4>
           <div className="inspector-row">
-            <span className="inspector-label">Tempo</span>
+            <span className="inspector-label">Rhythm</span>
             <span className="inspector-value">{pacing}</span>
           </div>
           <div className="inspector-row">
@@ -87,7 +87,7 @@ export default function CinematicInspector() {
         </section>
 
         <section className="inspector-section">
-          <h4>Camera & Composition</h4>
+          <h4>Camera & Framing</h4>
           <div className="inspector-row">
             <span className="inspector-label">Camera</span>
             <span className="inspector-value">{cameraMode.replace(/_/g, ' ')}</span>
@@ -97,7 +97,7 @@ export default function CinematicInspector() {
             <span className="inspector-value">{shotIntent}</span>
           </div>
           <div className="inspector-row">
-            <span className="inspector-label">Spatial Intent</span>
+            <span className="inspector-label">Framing Intent</span>
             <span className="inspector-value">{spatialIntent}</span>
           </div>
           <div className="inspector-row">

@@ -35,6 +35,26 @@ function formatBeatLabel(action: string): string {
   return action.replace(/_/g, ' ');
 }
 
+function getNarrativeContext(arcPhase: string | null, beatIndex: number, totalBeats: number): string {
+  if (!arcPhase) return '';
+  
+  // Return narrative labels based on emotional arc phase
+  const phase = arcPhase.toLowerCase();
+  if (phase.includes('building') || phase.includes('rising') || phase.includes('inciting')) {
+    return 'Building tension';
+  }
+  if (phase.includes('climax') || phase.includes('peak') || phase.includes('turning')) {
+    return 'Climax approaching';
+  }
+  if (phase.includes('falling') || phase.includes('release') || phase.includes('resolution')) {
+    return 'Aftermath';
+  }
+  if (phase.includes('exposition') || phase.includes('setup')) {
+    return 'Setting the scene';
+  }
+  return '';
+}
+
 export default function BeatTimelineV2() {
   const [scene, setScene] = useState<SceneGraph>(sceneStore.getScene());
 
@@ -53,8 +73,10 @@ export default function BeatTimelineV2() {
 
   const arc = scene.emotionalArc;
   const arcPhase = arc?.phases?.[arc.currentPhaseIndex]?.name ?? null;
+  const arcTotal = arc?.phases?.length ?? 1;
   const tensionLevel = scene.tensionState?.currentLevel ?? 0;
   const momentScore = scene.cinematicMomentScore?.overallScore ?? 0;
+  const narrativeContext = getNarrativeContext(arcPhase, sequence.currentIndex, sequence.beats.length);
 
   return (
     <div className="beat-timeline-v2">
@@ -62,8 +84,9 @@ export default function BeatTimelineV2() {
         <span className="btv2-title">{sequence.label}</span>
         <div className="btv2-meta">
           {arcPhase && <span className="btv2-arc">Arc: {arcPhase}</span>}
+          {narrativeContext && <span className="btv2-narrative">{narrativeContext}</span>}
           <span className="btv2-tension">Tension: {Math.round(tensionLevel * 100)}%</span>
-          <span className="btv2-moment">Score: {Math.round(momentScore * 100)}%</span>
+          <span className="btv2-moment">Impact: {Math.round(momentScore * 100)}%</span>
         </div>
       </div>
 

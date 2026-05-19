@@ -14,8 +14,8 @@ type DimensionConfig = {
 const DIMENSIONS: DimensionConfig[] = [
   { key: 'intimacy', label: 'Intimacy', min: 0, max: 1, step: 0.05 },
   { key: 'dominance', label: 'Dominance', min: -1, max: 1, step: 0.05 },
-  { key: 'emotionalDistance', label: 'Emotional Distance', min: 0, max: 1, step: 0.05 },
-  { key: 'socialTension', label: 'Social Tension', min: 0, max: 1, step: 0.05 },
+  { key: 'emotionalDistance', label: 'Distance', min: 0, max: 1, step: 0.05 },
+  { key: 'socialTension', label: 'Pressure', min: 0, max: 1, step: 0.05 },
   { key: 'vulnerability', label: 'Vulnerability', min: 0, max: 1, step: 0.05 },
   { key: 'isolation', label: 'Isolation', min: 0, max: 1, step: 0.05 },
 ];
