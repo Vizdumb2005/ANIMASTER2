@@ -9,6 +9,9 @@ import BeatTimeline from './components/BeatTimeline';
 import CameraPresets from './components/CameraPresets';
 import ActorDirector from './components/ActorDirector';
 import SceneGraphView from './components/SceneGraphView';
+import CinematicDirector from './components/CinematicDirector';
+import AIDebugPanel from './components/AIDebugPanel';
+import DemoSelector from './components/DemoSelector';
 
 export default function App() {
   return (
@@ -36,11 +39,14 @@ export default function App() {
         <CinematicControls />
         <CameraPresets />
         <ActorDirector />
+        <CinematicDirector />
+        <DemoSelector />
       </div>
 
       <SceneGraphView />
       <SessionSidebar />
       <DebugPanel />
+      <AIDebugPanel />
     </main>
   );
 }
