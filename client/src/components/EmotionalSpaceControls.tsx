@@ -35,7 +35,7 @@ export default function EmotionalSpaceControls() {
 
   const handleChange = useCallback((key: keyof EmotionalSpaceState, value: number) => {
     setSpace((prev) => ({ ...prev, [key]: value }));
-    // Apply to runtime via mutation
+    // Apply to runtime via mutation - mutateScene will notify subscribers
     sceneStore.mutateScene((draft) => {
       if (!draft.emotionalSpatial) {
         draft.emotionalSpatial = {
@@ -59,6 +59,8 @@ export default function EmotionalSpaceControls() {
         draft.emotionalSpatial.spatialIntent = value > 0.6 ? 'vulnerability' : draft.emotionalSpatial.spatialIntent;
       } else if (key === 'dominance') {
         draft.emotionalSpatial.spatialIntent = value > 0.5 ? 'dominance' : value < -0.5 ? 'vulnerability' : draft.emotionalSpatial.spatialIntent;
+      } else if (key === 'emotionalDistance') {
+        draft.emotionalSpatial.negativeSpaceRatio = 0.3 + value * 0.4;
       }
     });
   }, []);
