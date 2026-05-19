@@ -53,6 +53,8 @@ import { detectCinematicMoment } from './evolution/cinematicMomentDetector';
 import { applyEmotionalAftermath } from './continuity/emotionalAftermath';
 // Phase 3 imports
 import { reactEnvironmentToEmotion, applyEnvironmentReaction } from './environment/emotionalEnvironmentReactor';
+// Phase 6 imports
+import { applyWorldGeneration } from './world/proceduralWorldGenerator';
 
 let lastActorIds = new Set<string>();
 const TICK_DELTA_MS = 16;
@@ -177,6 +179,11 @@ export function evaluateScene(scene: SceneGraph): SceneGraph {
   // Phase 3: Emotional Environment Reactor
   const envReaction = reactEnvironmentToEmotion(scene);
   applyEnvironmentReaction(scene, envReaction);
+
+  // Phase 6: Procedural World Generation
+  if (!scene.worldPlan || !scene.worldLayout) {
+    applyWorldGeneration(scene);
+  }
 
   validateContinuity(scene);
   captureSnapshot(scene);
