@@ -11,6 +11,13 @@ export interface ExpressiveState {
   gazeWander: { x: number; y: number };
   blinkTimer: number;
   nextBlinkAt: number;
+  // Phase 8 enhancements
+  emotionPeakIntensity: number;    // Track peak intensity for recovery
+  lastEmotionChange: number;
+  hesitationPhase: number;  // For "looking away then back" pattern
+  weightShift: number;      // For nervous weight shifting
+  swayOffset: number;       // For sad/gentle swaying
+  recoveryTimer: number;   // For post-intensity recovery
 }
 
 const expressiveStates = new Map<string, ExpressiveState>();
@@ -27,6 +34,13 @@ export function getExpressiveState(actorId: string): ExpressiveState {
       gazeWander: { x: 0, y: 0 },
       blinkTimer: 0,
       nextBlinkAt: 2000 + Math.random() * 3000,
+      // Phase 8 enhancements
+      emotionPeakIntensity: 0,
+      lastEmotionChange: 0,
+      hesitationPhase: 0,
+      weightShift: 0,
+      swayOffset: 0,
+      recoveryTimer: 0,
     };
     expressiveStates.set(actorId, state);
   }
@@ -38,7 +52,19 @@ export function updateExpressiveState(actor: Actor, deltaMs: number): Expressive
   const emotion = actor.emotionState;
   const intensity = actor.emotionIntensity ?? 0.5;
 
-  // Breathing
+  // Track emotion changes for recovery animation
+  if (intensity > state.emotionPeakIntensity) {
+    state.emotionPeakIntensity = intensity;
+    state.lastEmotionChange = Date.now();
+    state.recoveryTimer = 0;
+  }
+
+  // Recovery timer - decreases after emotion intensity peaks
+  if (state.recoveryTimer < 1) {
+    state.recoveryTimer += deltaMs / 3000; // ~3 seconds to full recovery
+  }
+
+  // Breathing - more variation based on emotion
   const targetRate = getBreathingRate(emotion, intensity);
   state.breathingRate += (targetRate - state.breathingRate) * 0.05;
   state.breathingPhase += (deltaMs / 1000) * state.breathingRate * Math.PI;
@@ -48,22 +74,50 @@ export function updateExpressiveState(actor: Actor, deltaMs: number): Expressive
   const targetTilt = getTargetHeadTilt(emotion, intensity);
   state.headTilt += (targetTilt - state.headTilt) * 0.03;
 
-  // Idle motion
+  // Idle motion with emotional variation
   const targetIdle = getIdleMotionIntensity(emotion, intensity);
   state.idleMotion += (targetIdle - state.idleMotion) * 0.04;
 
-  // Stance variation
+  // Stance variation with emotional nuance 
   const targetStance = getStanceVariation(emotion);
   state.stanceVariation += (targetStance - state.stanceVariation) * 0.02;
 
-  // Gaze wander
+  // Weight shift for nervous emotions
+  if (emotion === 'nervous' || emotion === 'awkward') {
+    state.weightShift += (Math.random() - 0.5) * 0.15 * (1 + intensity);
+    state.weightShift = clamp(state.weightShift, -0.3, 0.3);
+  } else {
+    state.weightShift *= 0.95; // decay
+  }
+
+  // Sad sway
+  if (emotion === 'sad' || emotion === 'exhausted') {
+    state.swayOffset += (deltaMs / 1000) * 0.5; // gentle sway
+    state.swayOffset = state.swayOffset % (Math.PI * 2);
+  } else {
+    state.swayOffset *= 0.98;
+  }
+
+  // Gaze behavior: add "looking away then looking back" hesitation pattern for tense emotions
+  if (emotion === 'nervous' || emotion === 'awkward' || emotion === 'tense') {
+    state.hesitationPhase += deltaMs / 2000; // ~2 second cycle
+    const hesitationCycle = Math.sin(state.hesitationPhase * Math.PI);
+    if (hesitationCycle > 0.7) {
+      // Looking away
+      state.gazeWander.x += 0.05;
+    } else if (hesitationCycle < -0.5) {
+      // Looking back 
+      state.gazeWander.x -= 0.03;
+    }
+  }
+
   const wanderSpeed = emotion === 'nervous' ? 0.08 : emotion === 'sad' ? 0.02 : 0.04;
   state.gazeWander.x += (Math.random() - 0.5) * wanderSpeed;
   state.gazeWander.y += (Math.random() - 0.5) * wanderSpeed * 0.5;
   state.gazeWander.x = clamp(state.gazeWander.x, -0.4, 0.4);
   state.gazeWander.y = clamp(state.gazeWander.y, -0.2, 0.2);
 
-  // Blink
+  // Blink - emotion affects blink rate
   state.blinkTimer += deltaMs;
   if (state.blinkTimer >= state.nextBlinkAt) {
     state.blinkTimer = 0;

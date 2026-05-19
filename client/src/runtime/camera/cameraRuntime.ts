@@ -1,5 +1,7 @@
 import type { CameraMode, SceneGraph } from '@animaster/shared/scene';
 import type { RhythmRuntimeProfile, ToneRuntimeProfile } from '../semanticProfiles';
+import { sceneStore } from '../../store/sceneStore';
+import type { ShotDefinition } from '@animaster/shared/cinematicShots';
 
 export function evaluateCameraRuntime(scene: SceneGraph, width: number, height: number, tone: ToneRuntimeProfile, rhythm: RhythmRuntimeProfile) {
   const subjects = resolveSubjects(scene);
@@ -61,4 +63,64 @@ function resolveSubjects(scene: SceneGraph) {
   const subjectIds = scene.camera.plan?.subjectIds ?? [];
   const subjects = subjectIds.map((id) => scene.actors.find((actor) => actor.id === id)).filter(Boolean) as typeof scene.actors;
   return subjects.length > 0 ? subjects : scene.actors.slice(0, scene.cinematicGrammar?.tone === 'lonely' ? 1 : 2);
+}
+
+// Phase 8 — Shot transition integration
+// Apply shot definition with smooth camera transitions
+
+interface ShotTransitionState {
+  isTransitioning: boolean;
+  startTime: number;
+  duration: number;
+  startZoom: number;
+  targetZoom: number;
+}
+
+let currentShotTransition: ShotTransitionState | null = null;
+
+export function applyShotWithTransition(shot: ShotDefinition): void {
+  const scene = sceneStore.getScene();
+  const currentZoom = scene.camera.zoom ?? 1;
+  const targetZoom = (shot.zoomRange.min + shot.zoomRange.max) / 2;
+  
+  // Set up transition state
+  currentShotTransition = {
+    isTransitioning: true,
+    startTime: Date.now(),
+    duration: Math.round(shot.transitionSpeed * 1500), // Convert 0-1 speed to ms
+    startZoom: currentZoom,
+    targetZoom,
+  };
+}
+
+export function isShotTransitioning(): boolean {
+  if (!currentShotTransition) return false;
+  
+  const elapsed = Date.now() - currentShotTransition.startTime;
+  if (elapsed >= currentShotTransition.duration) {
+    currentShotTransition = null;
+    return false;
+  }
+  return true;
+}
+
+export function getShotTransitionProgress(): number {
+  if (!currentShotTransition) return 1;
+  
+  const elapsed = Date.now() - currentShotTransition.startTime;
+  const progress = elapsed / currentShotTransition.duration;
+  return Math.min(progress, 1);
+}
+
+export function getShotTransitionZoom(): number {
+  if (!currentShotTransition) return 1;
+  
+  const progress = getShotTransitionProgress();
+  // Ease in-out cubic
+  const eased = progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+  
+  return currentShotTransition.startZoom + 
+    (currentShotTransition.targetZoom - currentShotTransition.startZoom) * eased;
 }

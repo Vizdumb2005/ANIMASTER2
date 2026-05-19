@@ -9,5 +9,8 @@
   "scripts": {
     "build": "npm run build -w client && npm run build -w server",
     "dev": "npm run dev -w client & npm run dev -w server"
+  },
+  "dependencies": {
+    "ws": "^8.20.1"
   }
 }
