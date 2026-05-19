@@ -6,12 +6,18 @@ import CinematicControls from './components/CinematicControls';
 import PlaybackControls from './components/PlaybackControls';
 import SceneInfoOverlay from './components/SceneInfoOverlay';
 import BeatTimeline from './components/BeatTimeline';
+import BeatTimelineV2 from './components/BeatTimelineV2';
 import CameraPresets from './components/CameraPresets';
 import ActorDirector from './components/ActorDirector';
 import SceneGraphView from './components/SceneGraphView';
 import CinematicDirector from './components/CinematicDirector';
 import AIDebugPanel from './components/AIDebugPanel';
 import DemoSelector from './components/DemoSelector';
+import DirectorMode from './director/DirectorMode';
+import CinematicInspector from './components/CinematicInspector';
+import ShotSelector from './components/ShotSelector';
+import EmotionalSpaceControls from './components/EmotionalSpaceControls';
+import DirectorialStyleSelector from './components/DirectorialStyleSelector';
 
 export default function App() {
   return (
@@ -33,12 +39,16 @@ export default function App() {
         <SceneInfoOverlay />
         <PlaybackControls />
         <BeatTimeline />
+        <BeatTimelineV2 />
       </section>
 
       <div className="directing-panel">
         <CinematicControls />
         <CameraPresets />
         <ActorDirector />
+        <ShotSelector />
+        <EmotionalSpaceControls />
+        <DirectorialStyleSelector />
         <CinematicDirector />
         <DemoSelector />
       </div>
@@ -47,6 +57,8 @@ export default function App() {
       <SessionSidebar />
       <DebugPanel />
       <AIDebugPanel />
+      <DirectorMode />
+      <CinematicInspector />
     </main>
   );
 }

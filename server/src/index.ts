@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import interpretRouter from './routes/interpret.js';
 import mutateRouter from './routes/mutate.js';
+import liveMutateRouter from './routes/liveMutate.js';
 import aiRouter from './routes/ai.js';
 import { providerRegistry } from './ai/providers/providerRegistry.js';
 
@@ -20,6 +21,7 @@ app.get('/health', (_request, response) => {
 
 app.use('/interpret', interpretRouter);
 app.use('/mutate', mutateRouter);
+app.use('/live-mutate', liveMutateRouter);
 app.use('/ai', aiRouter);
 
 app.use((_request, response) => {

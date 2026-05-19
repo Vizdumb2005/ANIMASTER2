@@ -1152,3 +1152,507 @@ body {
   border-radius: 0.3rem;
   padding: 0.2rem 0.3rem;
 }
+
+/* ========== Phase 8: Director Mode ========== */
+.director-mode {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10001;
+  background: rgba(10, 12, 18, 0.97);
+  border-top: 1px solid rgba(255, 205, 147, 0.25);
+  padding: 0.6rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 40vh;
+}
+
+.director-mode .director-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.director-mode .director-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.92);
+}
+
+.director-tone {
+  font-size: 0.68rem;
+  color: rgba(246, 239, 231, 0.5);
+}
+
+.director-mode .director-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(246, 239, 231, 0.5);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.director-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.director-quick {
+  border: 1px solid rgba(255, 205, 147, 0.2);
+  border-radius: 2rem;
+  padding: 0.2rem 0.6rem;
+  background: rgba(255, 205, 147, 0.05);
+  color: rgba(255, 205, 147, 0.8);
+  font-size: 0.68rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.director-quick:hover {
+  background: rgba(255, 205, 147, 0.12);
+}
+
+.director-history {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.director-entry {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+}
+
+.director-cmd {
+  color: rgba(255, 205, 147, 0.7);
+  font-style: italic;
+}
+
+.director-effect {
+  color: rgba(246, 239, 231, 0.5);
+}
+
+.director-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.director-input {
+  flex: 1;
+  border: 1px solid rgba(255, 205, 147, 0.2);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.director-input:focus {
+  outline: 2px solid rgba(255, 205, 147, 0.4);
+  outline-offset: 1px;
+}
+
+.director-send {
+  border: 1px solid rgba(255, 205, 147, 0.35);
+  border-radius: 0.6rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 205, 147, 0.1);
+  color: #ffcc8f;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.director-send:hover {
+  background: rgba(255, 205, 147, 0.2);
+}
+
+/* ========== Phase 8: Cinematic Inspector ========== */
+.cinematic-inspector {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(380px, 85vw);
+  height: 100vh;
+  background: rgba(10, 12, 18, 0.97);
+  border-left: 1px solid rgba(255, 205, 147, 0.2);
+  z-index: 10002;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inspector-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.92);
+}
+
+.inspector-close {
+  background: none;
+  border: none;
+  color: rgba(246, 239, 231, 0.6);
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+}
+
+.inspector-section {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.inspector-section h4 {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.7);
+  margin: 0 0 0.3rem;
+}
+
+.inspector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  margin-bottom: 0.2rem;
+}
+
+.inspector-label {
+  color: rgba(246, 239, 231, 0.55);
+  min-width: 110px;
+}
+
+.inspector-value {
+  color: rgba(246, 239, 231, 0.9);
+}
+
+.inspector-value.tone-lonely { color: #8ab4f8; }
+.inspector-value.tone-tense { color: #ff948d; }
+.inspector-value.tone-sad { color: #a78bfa; }
+.inspector-value.tone-awkward { color: #fbbf24; }
+.inspector-value.tone-romantic { color: #f472b6; }
+.inspector-value.tone-energetic { color: #34d399; }
+.inspector-value.tone-threatening { color: #ef4444; }
+
+.inspector-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.inspector-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ffcc8f, #f39e5d);
+}
+
+/* ========== Phase 8: Beat Timeline V2 ========== */
+.beat-timeline-v2 {
+  position: absolute;
+  bottom: 55px;
+  left: 12px;
+  right: 12px;
+  z-index: 10;
+  background: rgba(10, 12, 18, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.btv2-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+
+.btv2-title {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 205, 147, 0.8);
+}
+
+.btv2-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.6rem;
+  color: rgba(246, 239, 231, 0.5);
+}
+
+.btv2-track {
+  display: flex;
+  gap: 2px;
+  height: 20px;
+}
+
+.btv2-beat {
+  flex: 1;
+  position: relative;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.btv2-beat-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--beat-color, #6b7280);
+  opacity: 0.5;
+  transition: width 0.3s;
+}
+
+.btv2-beat-active .btv2-beat-fill {
+  opacity: 0.8;
+}
+
+.btv2-beat-done .btv2-beat-fill {
+  opacity: 0.3;
+}
+
+.btv2-beat-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.55rem;
+  color: rgba(246, 239, 231, 0.7);
+  text-transform: capitalize;
+}
+
+.btv2-beat-active .btv2-beat-label {
+  color: #fff;
+  font-weight: 600;
+}
+
+.btv2-dramatic {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.btv2-dramatic-tag {
+  font-size: 0.58rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 1rem;
+  background: rgba(255, 148, 141, 0.1);
+  color: rgba(255, 148, 141, 0.8);
+  border: 1px solid rgba(255, 148, 141, 0.15);
+}
+
+/* ========== Phase 8: Shot Selector ========== */
+.shot-selector {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+}
+
+.shot-toggle {
+  background: none;
+  border: none;
+  color: rgba(255, 205, 147, 0.85);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.shot-list {
+  margin-top: 0.4rem;
+}
+
+.shot-group {
+  margin-bottom: 0.4rem;
+}
+
+.shot-group-label {
+  display: block;
+  font-size: 0.62rem;
+  color: rgba(246, 239, 231, 0.4);
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.shot-btn {
+  border: 1px solid rgba(138, 180, 248, 0.15);
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(138, 180, 248, 0.04);
+  color: rgba(138, 180, 248, 0.75);
+  font-size: 0.65rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin: 0.1rem;
+}
+
+.shot-btn:hover {
+  background: rgba(138, 180, 248, 0.12);
+}
+
+.shot-active {
+  background: rgba(138, 180, 248, 0.18);
+  border-color: rgba(138, 180, 248, 0.4);
+  color: #8ab4f8;
+}
+
+/* ========== Phase 8: Emotional Space Controls ========== */
+.emotional-space-controls {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+}
+
+.esc-toggle {
+  background: none;
+  border: none;
+  color: rgba(255, 205, 147, 0.85);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.esc-sliders {
+  margin-top: 0.4rem;
+}
+
+.esc-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.esc-label {
+  font-size: 0.68rem;
+  color: rgba(246, 239, 231, 0.6);
+  min-width: 100px;
+}
+
+.esc-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  outline: none;
+}
+
+.esc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #a78bfa;
+  cursor: pointer;
+}
+
+.esc-value {
+  font-size: 0.62rem;
+  color: rgba(167, 139, 250, 0.8);
+  min-width: 30px;
+  text-align: right;
+}
+
+/* ========== Phase 8: Directorial Style Selector ========== */
+.directorial-style-selector {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(14, 17, 24, 0.88);
+}
+
+.dss-toggle {
+  background: none;
+  border: none;
+  color: rgba(255, 205, 147, 0.85);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.dss-list {
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.dss-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dss-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dss-active {
+  border-color: rgba(255, 205, 147, 0.35);
+  background: rgba(255, 205, 147, 0.06);
+}
+
+.dss-name {
+  display: block;
+  font-size: 0.72rem;
+  color: rgba(246, 239, 231, 0.85);
+}
+
+.dss-desc {
+  display: block;
+  font-size: 0.6rem;
+  color: rgba(246, 239, 231, 0.4);
+}
