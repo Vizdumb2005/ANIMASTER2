@@ -200,7 +200,7 @@ function buildOrchestrationScene(scene: ScenePatch) {
       : [],
     camera: scene.camera,
     atmosphere: scene.atmosphere,
-    cinematicGrammar: scene.cinematicGrammar
+    cinematicGrammar: scene.cinematicGrammar ? { pacing: scene.cinematicGrammar.tone } : undefined
   };
 }
 
