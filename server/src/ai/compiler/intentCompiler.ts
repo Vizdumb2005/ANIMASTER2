@@ -37,6 +37,7 @@ const KEYWORD_RULES: KeywordWeight[] = [
   // Intimacy
   { pattern: /intimate|close|tender/i, weights: { intimacyLevel: 0.8, blockingStyle: 'intimate', compositionStyle: 'compressed', cameraAggression: 0.2 } },
   { pattern: /distant|apart|separated/i, weights: { intimacyLevel: 0.1, visualIsolation: 0.7, compositionStyle: 'expansive' } },
+  { pattern: /emotional\s+distance/i, weights: { intimacyLevel: 0.1, visualIsolation: 0.7, compositionStyle: 'expansive', cameraAggression: 0.2 } },
   { pattern: /nostalgic|memory|remember/i, weights: { emotionalPressure: 0.5, lightingLanguage: 'warm_intimate', pacingStyle: 'slow_heavy' } },
 
   // Environment density
@@ -84,6 +85,7 @@ const DEFAULT_INTENT: CinematicIntent = {
 export function compileIntent(prompt: string): CinematicIntent {
   const intent: CinematicIntent = { ...DEFAULT_INTENT };
   let matchCount = 0;
+  const hasRestraint = /restrained|controlled|suppressed/i.test(prompt);
 
   for (const rule of KEYWORD_RULES) {
     if (rule.pattern.test(prompt)) {
@@ -119,6 +121,10 @@ export function compileIntent(prompt: string): CinematicIntent {
 
   if (intent.threatLevel > 0.5) {
     intent.lightingLanguage = intent.lightingLanguage === 'natural' ? 'dramatic' : intent.lightingLanguage;
+  }
+
+  if (hasRestraint) {
+    intent.cameraAggression = Math.min(intent.cameraAggression, 0.5);
   }
 
   return intent;

@@ -92,15 +92,18 @@ const DIRECTOR_CONTROLS: DirectorControl[] = [
 
 export default function CinematicDirector() {
   const [collapsed, setCollapsed] = useState(true);
-  const [values, setValues] = useState<Record<string, number>>(
-    Object.fromEntries(DIRECTOR_CONTROLS.map(c => [c.key, c.defaultValue]))
-  );
+  const [values, setValues] = useState<Record<string, number>>(() => {
+    const stored = sceneStore.getDirectorIntent();
+    return Object.fromEntries(
+      DIRECTOR_CONTROLS.map(c => [c.key, Math.round((stored[c.key] ?? c.defaultValue / 100) * 100)])
+    );
+  });
 
   function applyDirectorControl(key: string, value: number) {
     const scene = sceneStore.getScene();
-    if (scene.version === 0) return;
-
     const normalized = value / 100;
+    sceneStore.setDirectorIntent(key, normalized);
+    if (scene.version === 0) return;
 
     switch (key) {
       case 'emotionalIntensity': {
@@ -225,6 +228,7 @@ export default function CinematicDirector() {
               min="0"
               max="100"
               value={value}
+              aria-label={control.label}
               onChange={(e) => {
                 const v = Number(e.target.value);
                 setValues(prev => ({ ...prev, [control.key]: v }));

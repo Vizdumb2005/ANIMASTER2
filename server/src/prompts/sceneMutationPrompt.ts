@@ -183,6 +183,12 @@ Rules:
 - Valid actions: idle, walking, sitting, approaching, pacing.
 - Keep joints consistent with actor position. Head is ~58px above position.y, torso ~30px above, arms ~28px to each side and ~10px above, legs ~18px to each side and ~42px below.
 
+## Director Context
+- The user prompt may include a "Director context" JSON block.
+- Use directorIntent values (0 to 1) as soft style modifiers unless they conflict with the edit instruction.
+- If beatSequence is present, align rhythm pacing and camera energy to the current beat.
+- When actorOverrides are present, keep actor emotions aligned with those overrides.
+
 ## Tonal Edits (Phase 2)
 - When the user says "make the scene feel more lonely/tense/sad/etc.", update the cinematicGrammar.tone and template accordingly.
 - Lonely: wide_shot camera, high spacing, low energy, cold lighting.
@@ -228,6 +234,7 @@ Examples:
    → Change the approaching actor's currentAction to 'idle', update relationship type.
 `.trim();
 
-export function buildSceneMutationUserPrompt(prompt: string, currentScene: string) {
-  return `Current scene state:\n${currentScene}\n\nUser edit instruction: ${prompt}\n\nReturn the complete patched scene JSON with actors, environment, and camera.`;
+export function buildSceneMutationUserPrompt(prompt: string, currentScene: string, context?: string) {
+  const contextBlock = context ? `\n\nDirector context:\n${context}` : '';
+  return `Current scene state:\n${currentScene}\n\nUser edit instruction: ${prompt}${contextBlock}\n\nReturn the complete patched scene JSON with actors, environment, and camera.`;
 }

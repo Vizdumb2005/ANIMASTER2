@@ -33,6 +33,7 @@ export default function ActorDirector() {
 
     const updatedActors = [...scene.actors];
     updatedActors[actorIdx] = { ...updatedActors[actorIdx], emotionState: emotion };
+    sceneStore.setActorOverride(selectedActorId, emotion);
     sceneStore.applyPatch({ ...scene, actors: updatedActors }, `[direct] ${selectedActorId} → ${emotion}`);
   }, [selectedActorId]);
 

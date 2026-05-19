@@ -2,7 +2,18 @@ import type { SceneGraph } from '@animaster/shared/scene';
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3001';
 
-export async function mutateScene(prompt: string, currentScene: SceneGraph): Promise<Partial<SceneGraph>> {
+type DirectingContext = {
+  directorIntent?: Record<string, number>;
+  actorOverrides?: Array<{ actorId: string; emotion: string; intensity?: number }>;
+  beatSequence?: {
+    id?: string;
+    label?: string;
+    currentIndex?: number;
+    beats?: Array<{ action: string; durationMs: number }>;
+  };
+};
+
+export async function mutateScene(prompt: string, currentScene: SceneGraph, directing?: DirectingContext): Promise<Partial<SceneGraph>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35000);
 
@@ -15,6 +26,7 @@ export async function mutateScene(prompt: string, currentScene: SceneGraph): Pro
       },
       body: JSON.stringify({
         prompt,
+        directing,
         currentScene: {
           actors: currentScene.actors,
           environment: currentScene.environment,

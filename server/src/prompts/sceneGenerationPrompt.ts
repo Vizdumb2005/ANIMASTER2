@@ -189,6 +189,12 @@ Rules:
 - Keep joints consistent with actor position. Head is ~58px above position.y, torso ~30px above, arms ~28px to each side and ~10px above, legs ~18px to each side and ~42px below.
 - Always include a sessionHistory entry with the user's prompt.
 
+## Director Context
+- The user prompt may include a "Director context" JSON block.
+- Use directorIntent values (0 to 1) as style modifiers for camera energy, pacing, contrast, and atmosphere.
+- When actorOverrides are present, align actor emotions to them when feasible.
+- If beatSequence is present, align rhythm pacing and camera energy to the current beat.
+
 ## Phase 2 Fields
 - ALWAYS include cinematicGrammar, atmosphere, relationships, and rhythm fields.
 - Infer the scene tone from the prompt: sad, tense, lonely, awkward, energetic, romantic, threatening, or neutral.
@@ -212,6 +218,7 @@ Examples:
    Output: two humanoid actors, one walking with targetPosition, one idle. Dark environment, relationships array.
 `.trim();
 
-export function buildSceneGenerationUserPrompt(prompt: string) {
-  return `User prompt: ${prompt}\nReturn only the SceneGraph JSON object.`;
+export function buildSceneGenerationUserPrompt(prompt: string, context?: string) {
+  const contextBlock = context ? `\n\nDirector context:\n${context}` : '';
+  return `User prompt: ${prompt}${contextBlock}\nReturn only the SceneGraph JSON object.`;
 }

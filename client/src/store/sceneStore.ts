@@ -1,4 +1,4 @@
-import { Actor, AtmosphereProfile, Camera, CinematicGrammar, Environment, SceneGraph, SceneRhythm, SessionEntry, SemanticMutationOperation } from '@animaster/shared/scene';
+import { Actor, ActorEmotion, AtmosphereProfile, BeatSequence, Camera, CinematicGrammar, Environment, SceneGraph, SceneRhythm, SessionEntry, SemanticMutationOperation } from '@animaster/shared/scene';
 import { initActorJoints } from '../runtime/initActorJoints';
 import { resetSceneEvaluator } from '../runtime/sceneEvaluator';
 import { createDefaultAnchors } from '../runtime/semanticAnchors';
@@ -8,8 +8,47 @@ import { resetArcAtmosphereCache } from '../runtime/arcs/arcAtmosphereEffect';
 
 type SceneListener = (scene: SceneGraph) => void;
 
+type DirectorIntent = Record<string, number>;
+
+type ActorOverride = {
+  actorId: string;
+  emotion: ActorEmotion;
+  intensity?: number;
+};
+
+type DirectingContext = {
+  directorIntent: DirectorIntent;
+  actorOverrides: ActorOverride[];
+  beatSequence?: {
+    id?: string;
+    label?: string;
+    currentIndex?: number;
+    beats: Array<{ action: string; durationMs: number }>;
+  };
+};
+
+const DEFAULT_DIRECTOR_INTENT: DirectorIntent = {
+  emotionalIntensity: 0.5,
+  visualDensity: 0.5,
+  environmentalRichness: 0.5,
+  symbolicAbstraction: 0.3,
+  dialogueNaturalism: 0.6,
+  cinematicRealism: 0.5,
+  cameraAggression: 0.3,
+  atmosphereWeight: 0.5,
+  directorialIntensity: 0.5
+};
+
+function clamp01(value: number) {
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
 let isPaused = false;
 let playbackSpeed = 1;
+let directorIntent: DirectorIntent = { ...DEFAULT_DIRECTOR_INTENT };
+let actorOverrides: Record<string, ActorOverride> = {};
 
 function createDefaultScene(): SceneGraph {
   const environment: Environment = {
@@ -115,15 +154,81 @@ function notify() {
   }
 }
 
+function applyActorOverrides(scene: SceneGraph) {
+  const overrideValues = Object.values(actorOverrides);
+  if (overrideValues.length === 0) return;
+
+  const overrideMap = new Map(overrideValues.map((override) => [override.actorId, override]));
+  for (const actor of scene.actors) {
+    const override = overrideMap.get(actor.id);
+    if (!override) continue;
+    actor.emotionState = override.emotion;
+    if (override.intensity !== undefined) {
+      actor.emotionIntensity = override.intensity;
+    }
+  }
+}
+
+function cleanupActorOverrides(scene: SceneGraph) {
+  const actorIds = new Set(scene.actors.map((actor) => actor.id));
+  for (const actorId of Object.keys(actorOverrides)) {
+    if (!actorIds.has(actorId)) {
+      delete actorOverrides[actorId];
+    }
+  }
+}
+
+function summarizeBeatSequence(sequence?: BeatSequence): DirectingContext['beatSequence'] | undefined {
+  if (!sequence || !Array.isArray(sequence.beats)) return undefined;
+  return {
+    id: sequence.id,
+    label: sequence.label,
+    currentIndex: sequence.currentIndex,
+    beats: sequence.beats.map((beat) => ({
+      action: beat.action,
+      durationMs: beat.durationMs
+    }))
+  };
+}
+
 export const sceneStore = {
   getScene(): SceneGraph {
     return cloneScene(currentScene);
+  },
+
+  getDirectorIntent(): DirectorIntent {
+    return { ...directorIntent };
+  },
+
+  setDirectorIntent(key: string, value: number) {
+    directorIntent = { ...directorIntent, [key]: clamp01(value) };
+  },
+
+  setActorOverride(actorId: string, emotion: ActorEmotion, intensity?: number) {
+    actorOverrides = { ...actorOverrides, [actorId]: { actorId, emotion, intensity } };
+  },
+
+  getActorOverrides(): ActorOverride[] {
+    return Object.values(actorOverrides);
+  },
+
+  clearActorOverrides() {
+    actorOverrides = {};
+  },
+
+  getDirectingContext(): DirectingContext {
+    return {
+      directorIntent: { ...directorIntent },
+      actorOverrides: Object.values(actorOverrides),
+      beatSequence: summarizeBeatSequence(currentScene.beatSequence)
+    };
   },
 
   setScene(scene: SceneGraph) {
     resetSceneEvaluator();
     currentScene = cloneScene(scene);
     ensureSemanticRuntimeState(currentScene);
+    actorOverrides = {};
     for (const actor of currentScene.actors) {
       actor.joints = initActorJoints(actor.position);
     }
@@ -225,6 +330,8 @@ export const sceneStore = {
       draft.environmentReaction = undefined;
     }
 
+    cleanupActorOverrides(draft);
+    applyActorOverrides(draft);
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
     if (Array.isArray(operations) && operations.length > 0) {
@@ -273,6 +380,7 @@ export const sceneStore = {
     currentScene = createDefaultScene();
     isPaused = false;
     playbackSpeed = 1;
+    actorOverrides = {};
     notify();
   },
 

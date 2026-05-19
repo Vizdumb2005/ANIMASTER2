@@ -4,7 +4,18 @@ const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 
 
 type InterpretResponse = SceneGraph;
 
-export async function interpretScene(prompt: string): Promise<SceneGraph> {
+type DirectingContext = {
+  directorIntent?: Record<string, number>;
+  actorOverrides?: Array<{ actorId: string; emotion: string; intensity?: number }>;
+  beatSequence?: {
+    id?: string;
+    label?: string;
+    currentIndex?: number;
+    beats?: Array<{ action: string; durationMs: number }>;
+  };
+};
+
+export async function interpretScene(prompt: string, directing?: DirectingContext): Promise<SceneGraph> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35000);
 
@@ -15,7 +26,7 @@ export async function interpretScene(prompt: string): Promise<SceneGraph> {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, directing }),
       signal: controller.signal
     });
   } catch (error) {

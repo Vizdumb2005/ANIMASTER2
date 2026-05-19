@@ -27,7 +27,7 @@ const SEMANTIC_PATTERNS: Array<{
   createOperations: (intent: CinematicIntent, match: RegExpMatchArray) => SemanticGraphOperation[];
 }> = [
   {
-    pattern: /(?:increase|add|more)\s+(?:emotional\s+)?distance/i,
+    pattern: /(?:increase|add|more|create)\s+(?:emotional\s+)?distance/i,
     createOperations: (intent) => [
       {
         type: 'spatial_relationship',

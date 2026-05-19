@@ -25,11 +25,12 @@ export default function PromptBar() {
       const currentScene = sceneStore.getScene();
       const hasExistingScene = currentScene.actors.length > 0 && currentScene.version > 0;
 
+      const directing = sceneStore.getDirectingContext();
       if (hasExistingScene) {
-        const patch = await mutateScene(trimmedPrompt, currentScene);
+        const patch = await mutateScene(trimmedPrompt, currentScene, directing);
         sceneStore.applyPatch(patch, trimmedPrompt);
       } else {
-        const scene = await interpretScene(trimmedPrompt);
+        const scene = await interpretScene(trimmedPrompt, directing);
         for (const actor of scene.actors) {
           actor.joints = initActorJoints(actor.position);
         }

@@ -1,4 +1,8 @@
 import { Router } from 'express';
+import { providerRegistry } from '../ai/providers/providerRegistry.js';
+import { orchestrator } from '../ai/runtime/orchestrator.js';
+import type { ProviderName } from '../ai/providers/providerInterface.js';
+import { getDirectorIntentAdjustments, type DirectorIntent } from '../ai/directing/directorIntent.js';
 import {
   buildSceneMutationUserPrompt,
   sceneMutationResponseSchema,
@@ -16,6 +20,7 @@ type MutateRequestBody = {
     relationships?: unknown;
     rhythm?: unknown;
   };
+  directing?: DirectingContext;
 };
 
 type ScenePatch = {
@@ -79,11 +84,31 @@ type ScenePatch = {
   semanticOperations?: Array<Record<string, unknown>>;
 };
 
+type ActorOverride = {
+  actorId: string;
+  emotion: ScenePatch['actors'][number]['emotionState'];
+  intensity?: number;
+};
+
+type BeatSequenceContext = {
+  id?: string;
+  label?: string;
+  currentIndex?: number;
+  beats?: Array<{ action: string; durationMs: number }>;
+};
+
+type DirectingContext = {
+  directorIntent?: DirectorIntent;
+  actorOverrides?: ActorOverride[];
+  beatSequence?: BeatSequenceContext;
+};
+
 const router = Router();
 
 router.post('/', async (request, response) => {
   const body = request.body as Partial<MutateRequestBody> | undefined;
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+  const directing = body?.directing;
 
   if (!prompt) {
     response.status(400).json({ error: 'prompt is required' });
@@ -96,7 +121,7 @@ router.post('/', async (request, response) => {
   }
 
   try {
-    const patch = await mutateScene(prompt, body.currentScene);
+    const patch = await mutateScene(prompt, body.currentScene, directing);
     response.json(patch);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to mutate scene';
@@ -104,61 +129,133 @@ router.post('/', async (request, response) => {
   }
 });
 
-async function mutateScene(prompt: string, currentScene: unknown): Promise<Partial<ScenePatch>> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+async function mutateScene(prompt: string, currentScene: unknown, directing?: DirectingContext): Promise<Partial<ScenePatch>> {
+  const scene = currentScene as ScenePatch;
+  const orchestration = await orchestrator.orchestrateMutation(prompt, buildOrchestrationScene(scene));
+  const context = buildMutationContext(directing, orchestration);
+  const provider = resolveProvider(orchestration.providerUsed);
 
-  if (!apiKey) {
-    return createFallbackPatch(prompt, currentScene as ScenePatch);
+  if (!provider || provider.name === 'mock') {
+    const fallback = createFallbackPatch(prompt, scene);
+    const directedFallback = applyDirectorIntentToPatch(fallback, scene, directing?.directorIntent);
+    return applyActorOverrides(directedFallback, scene, directing?.actorOverrides);
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-
+  let parsed: ScenePatch;
   try {
-    const result = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: sceneMutationSystemPrompt },
-          { role: 'user', content: buildSceneMutationUserPrompt(prompt, JSON.stringify(currentScene, null, 2)) }
-        ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'animaster_scene_patch',
-            schema: sceneMutationResponseSchema,
-            strict: true
-          }
-        },
-        temperature: 0.2
-      }),
-      signal: controller.signal
+    const completion = await provider.complete({
+      messages: [
+        { role: 'system', content: sceneMutationSystemPrompt },
+        { role: 'user', content: buildSceneMutationUserPrompt(prompt, JSON.stringify(currentScene, null, 2), context) }
+      ],
+      temperature: 0.2,
+      maxTokens: 1500,
+      responseFormat: 'json',
+      jsonSchema: sceneMutationResponseSchema
     });
 
-    if (!result.ok) {
-      throw new Error(`OpenAI request failed with status ${result.status}`);
+    if (!completion.content || !completion.content.trim()) {
+      throw new Error('Provider response did not include patch JSON');
     }
 
-    const payload = (await result.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = payload.choices?.[0]?.message?.content;
-
-    if (typeof content !== 'string' || !content.trim()) {
-      throw new Error('OpenAI response did not include patch JSON');
-    }
-
-    const parsed = JSON.parse(content) as ScenePatch;
-    return normalizePatch(parsed, currentScene as ScenePatch);
-  } finally {
-    clearTimeout(timeout);
+    parsed = JSON.parse(completion.content) as ScenePatch;
+  } catch (error) {
+    const fallback = createFallbackPatch(prompt, scene);
+    const directedFallback = applyDirectorIntentToPatch(fallback, scene, directing?.directorIntent);
+    return applyActorOverrides(directedFallback, scene, directing?.actorOverrides);
   }
+
+  const normalized = normalizePatch(parsed, scene);
+  const directedPatch = applyDirectorIntentToPatch(normalized, scene, directing?.directorIntent);
+  return applyActorOverrides(directedPatch, scene, directing?.actorOverrides);
+}
+
+type MutationOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateMutation>>;
+
+const PROVIDER_NAMES: ProviderName[] = ['openai', 'anthropic', 'gemini', 'ollama', 'mock'];
+
+function isProviderName(value: string): value is ProviderName {
+  return PROVIDER_NAMES.includes(value as ProviderName);
+}
+
+function resolveProvider(preferred?: string) {
+  if (preferred && isProviderName(preferred)) {
+    const provider = providerRegistry.getProvider(preferred);
+    if (provider?.isAvailable) return provider;
+  }
+  return providerRegistry.getBestAvailableProvider();
+}
+
+function buildOrchestrationScene(scene: ScenePatch) {
+  return {
+    tone: scene.cinematicGrammar?.tone ?? 'neutral',
+    environment: scene.environment ? { type: scene.environment.type } : { type: 'indoor_room' },
+    actors: Array.isArray(scene.actors)
+      ? scene.actors.map(actor => ({
+        id: actor.id,
+        emotionState: actor.emotionState,
+        position: actor.position,
+        currentAction: actor.currentAction
+      }))
+      : [],
+    camera: scene.camera,
+    atmosphere: scene.atmosphere,
+    cinematicGrammar: scene.cinematicGrammar
+  };
+}
+
+function buildMutationContext(directing: DirectingContext | undefined, orchestration: MutationOrchestration) {
+  const contextPayload = {
+    directorIntent: directing?.directorIntent ?? null,
+    actorOverrides: directing?.actorOverrides ?? [],
+    beatSequence: summarizeBeatSequence(directing?.beatSequence),
+    mutationPlan: orchestration.mutationPlan,
+    continuityCheck: orchestration.continuityCheck,
+    intent: orchestration.intent,
+    semanticContext: orchestration.context
+  };
+
+  return JSON.stringify(contextPayload, null, 2);
+}
+
+function summarizeBeatSequence(sequence?: BeatSequenceContext) {
+  if (!sequence || !Array.isArray(sequence.beats)) return undefined;
+  return {
+    id: sequence.id,
+    label: sequence.label,
+    currentIndex: sequence.currentIndex,
+    beats: sequence.beats.map((beat) => ({
+      action: beat.action,
+      durationMs: beat.durationMs
+    }))
+  };
+}
+
+function applyActorOverrides(
+  patch: Partial<ScenePatch>,
+  currentScene: ScenePatch,
+  overrides?: ActorOverride[]
+): Partial<ScenePatch> {
+  if (!overrides || overrides.length === 0) return patch;
+
+  const overrideMap = new Map(overrides.map(override => [override.actorId, override]));
+  const sourceActors = Array.isArray(patch.actors) && patch.actors.length > 0
+    ? patch.actors
+    : (Array.isArray(currentScene.actors) ? currentScene.actors : []);
+
+  const updatedActors = sourceActors.map(actor => {
+    const override = overrideMap.get(actor.id);
+    if (!override) return actor;
+    return {
+      ...actor,
+      emotionState: override.emotion
+    };
+  });
+
+  return {
+    ...patch,
+    actors: updatedActors
+  };
 }
 
 function createFallbackPatch(prompt: string, currentScene: ScenePatch): Partial<ScenePatch> {
@@ -636,6 +733,66 @@ function normalizePatch(patch: ScenePatch, currentScene: ScenePatch): ScenePatch
     relationships: Array.isArray(patch.relationships) ? patch.relationships : currentScene.relationships,
     rhythm: patch.rhythm ?? currentScene.rhythm,
     semanticOperations: Array.isArray(patch.semanticOperations) ? patch.semanticOperations : []
+  };
+}
+
+function applyDirectorIntentToPatch(
+  patch: Partial<ScenePatch>,
+  currentScene: ScenePatch,
+  intent?: DirectorIntent
+): Partial<ScenePatch> {
+  const adjustments = getDirectorIntentAdjustments(intent);
+  if (!adjustments) return patch;
+
+  const baseCamera = patch.camera ?? currentScene.camera ?? { x: 0, y: 0, zoom: 1, mode: 'static' };
+  const baseGrammar = patch.cinematicGrammar ?? currentScene.cinematicGrammar ?? {
+    tone: 'neutral',
+    template: {
+      cameraMode: 'static',
+      spacingMultiplier: 1.0,
+      motionEnergyScale: 1.0,
+      pauseFrequency: 4,
+      contrastBoost: 0.0,
+      headroom: 1.0
+    }
+  };
+  const baseAtmosphere = patch.atmosphere ?? currentScene.atmosphere ?? {
+    effects: ['none'],
+    lightingTint: 'rgba(0,0,0,0)',
+    ambientIntensity: 1.0
+  };
+  const baseRhythm = patch.rhythm ?? currentScene.rhythm ?? {
+    tempo: 'medium',
+    pauseFrequencyPerMinute: 4,
+    motionEnergyCurve: 'linear'
+  };
+
+  return {
+    ...patch,
+    camera: {
+      ...baseCamera,
+      zoom: adjustments.cameraZoom
+    },
+    cinematicGrammar: {
+      ...baseGrammar,
+      template: {
+        ...baseGrammar.template,
+        spacingMultiplier: adjustments.spacingMultiplier,
+        motionEnergyScale: adjustments.motionEnergyScale,
+        pauseFrequency: adjustments.pauseFrequency,
+        contrastBoost: adjustments.contrastBoost,
+        headroom: adjustments.headroom
+      }
+    },
+    atmosphere: {
+      ...baseAtmosphere,
+      ambientIntensity: adjustments.ambientIntensity,
+      lightingTint: adjustments.lightingTint
+    },
+    rhythm: {
+      ...baseRhythm,
+      pauseFrequencyPerMinute: adjustments.pauseFrequency
+    }
   };
 }
 

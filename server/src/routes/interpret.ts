@@ -1,4 +1,8 @@
 import { Router } from 'express';
+import { providerRegistry } from '../ai/providers/providerRegistry.js';
+import { orchestrator } from '../ai/runtime/orchestrator.js';
+import type { ProviderName } from '../ai/providers/providerInterface.js';
+import { getDirectorIntentAdjustments, type DirectorIntent } from '../ai/directing/directorIntent.js';
 import {
   buildSceneGenerationUserPrompt,
   sceneGenerationResponseSchema,
@@ -83,10 +87,36 @@ type SceneGraphResponse = {
   };
 };
 
+type ActorOverride = {
+  actorId: string;
+  emotion: SceneGraphResponse['actors'][number]['emotionState'];
+  intensity?: number;
+};
+
+type BeatSequenceContext = {
+  id?: string;
+  label?: string;
+  currentIndex?: number;
+  beats?: Array<{ action: string; durationMs: number }>;
+};
+
+type DirectingContext = {
+  directorIntent?: DirectorIntent;
+  actorOverrides?: ActorOverride[];
+  beatSequence?: BeatSequenceContext;
+};
+
+type InterpretRequestBody = {
+  prompt?: string;
+  directing?: DirectingContext;
+};
+
 const router = Router();
 
 router.post('/', async (request, response) => {
-  const prompt = typeof request.body?.prompt === 'string' ? request.body.prompt.trim() : '';
+  const body = request.body as InterpretRequestBody | undefined;
+  const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+  const directing = body?.directing;
 
   if (!prompt) {
     response.status(400).json({ error: 'prompt is required' });
@@ -94,7 +124,7 @@ router.post('/', async (request, response) => {
   }
 
   try {
-    const scene = await interpretPrompt(prompt);
+    const scene = await interpretPrompt(prompt, directing);
     response.json(scene);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -106,75 +136,144 @@ router.post('/', async (request, response) => {
   }
 });
 
-async function interpretPrompt(prompt: string): Promise<SceneGraphResponse> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<SceneGraphResponse> {
+  const orchestration = await orchestrator.orchestrateSceneGeneration(prompt);
+  const context = buildGenerationContext(directing, orchestration);
+  const provider = resolveProvider(orchestration.providerUsed);
 
-  if (!apiKey) {
-    return createFallbackScene(prompt);
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-
-  let result: Response;
-  try {
-    result = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: sceneGenerationSystemPrompt },
-        { role: 'user', content: buildSceneGenerationUserPrompt(prompt) }
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'animaster_scene_graph',
-          schema: sceneGenerationResponseSchema,
-          strict: true
-        }
-      },
-      temperature: 0.2
-    }),
-    signal: controller.signal
-  });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!result.ok) {
-    throw new Error(`OpenAI request failed with status ${result.status}`);
-  }
-
-  let payload: { choices?: Array<{ message?: { content?: string } }> };
-  try {
-    payload = (await result.json()) as typeof payload;
-  } catch {
-    console.error('Failed to parse OpenAI JSON response, using fallback');
-    return createFallbackScene(prompt);
-  }
-
-  const content = payload.choices?.[0]?.message?.content;
-
-  if (typeof content !== 'string' || !content.trim()) {
-    console.error('OpenAI response did not include content, using fallback');
-    return createFallbackScene(prompt);
+  if (!provider || provider.name === 'mock') {
+    const fallback = createFallbackScene(prompt);
+    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
+    return applyDirectorIntentToScene(fallback, directing?.directorIntent);
   }
 
   let parsed: SceneGraphResponse;
   try {
-    parsed = JSON.parse(content) as SceneGraphResponse;
-  } catch {
-    console.error('Malformed JSON from OpenAI, using fallback');
-    return createFallbackScene(prompt);
+    const completion = await provider.complete({
+      messages: [
+        { role: 'system', content: sceneGenerationSystemPrompt },
+        { role: 'user', content: buildSceneGenerationUserPrompt(prompt, context) }
+      ],
+      temperature: 0.2,
+      maxTokens: 2000,
+      responseFormat: 'json',
+      jsonSchema: sceneGenerationResponseSchema
+    });
+
+    if (!completion.content || !completion.content.trim()) {
+      throw new Error('Provider response was empty');
+    }
+
+    parsed = JSON.parse(completion.content) as SceneGraphResponse;
+  } catch (error) {
+    console.error('Scene generation failed, using fallback', error);
+    const fallback = createFallbackScene(prompt);
+    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
+    return fallback;
   }
 
-  return normalizeSceneGraph(parsed, prompt);
+  const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
+  const worldPlan = resolveWorldPlan(prompt, actorCount, orchestration.scenePlan);
+  const normalized = normalizeSceneGraph(parsed, prompt, worldPlan);
+  return applyDirectorIntentToScene(normalized, directing?.directorIntent);
+}
+
+type SceneOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateSceneGeneration>>;
+
+const PROVIDER_NAMES: ProviderName[] = ['openai', 'anthropic', 'gemini', 'ollama', 'mock'];
+
+function isProviderName(value: string): value is ProviderName {
+  return PROVIDER_NAMES.includes(value as ProviderName);
+}
+
+function resolveProvider(preferred?: string) {
+  if (preferred && isProviderName(preferred)) {
+    const provider = providerRegistry.getProvider(preferred);
+    if (provider?.isAvailable) return provider;
+  }
+  return providerRegistry.getBestAvailableProvider();
+}
+
+function buildGenerationContext(directing: DirectingContext | undefined, orchestration: SceneOrchestration) {
+  if (!directing && !orchestration) return '';
+
+  const contextPayload = {
+    directorIntent: directing?.directorIntent ?? null,
+    actorOverrides: directing?.actorOverrides ?? [],
+    beatSequence: summarizeBeatSequence(directing?.beatSequence),
+    scenePlan: orchestration.scenePlan,
+    intent: orchestration.intent,
+    agentReports: orchestration.agentReports,
+    semanticContext: orchestration.context
+  };
+
+  return JSON.stringify(contextPayload, null, 2);
+}
+
+function summarizeBeatSequence(sequence?: BeatSequenceContext) {
+  if (!sequence || !Array.isArray(sequence.beats)) return undefined;
+  return {
+    id: sequence.id,
+    label: sequence.label,
+    currentIndex: sequence.currentIndex,
+    beats: sequence.beats.map((beat) => ({
+      action: beat.action,
+      durationMs: beat.durationMs
+    }))
+  };
+}
+
+function resolveWorldPlan(prompt: string, actorCount: number, scenePlan?: Record<string, unknown>): SceneGraphResponse['worldPlan'] {
+  const base = planScene(prompt, actorCount);
+  if (!scenePlan || typeof scenePlan !== 'object') {
+    return base as SceneGraphResponse['worldPlan'];
+  }
+
+  return {
+    ...base,
+    locationType: typeof scenePlan.locationType === 'string' ? scenePlan.locationType : base.locationType,
+    timeOfDay: typeof scenePlan.timeOfDay === 'string' ? scenePlan.timeOfDay : base.timeOfDay,
+    tone: typeof scenePlan.tone === 'string' ? scenePlan.tone : base.tone,
+    weather: typeof scenePlan.weather === 'string' ? scenePlan.weather : base.weather,
+    compositionStyle: typeof scenePlan.compositionStyle === 'string' ? scenePlan.compositionStyle : base.compositionStyle,
+    lightingLanguage: typeof scenePlan.lightingLanguage === 'string' ? scenePlan.lightingLanguage : base.lightingLanguage,
+    cameraLanguage: typeof scenePlan.cameraLanguage === 'string' ? scenePlan.cameraLanguage : base.cameraLanguage,
+    keyProps: Array.isArray(scenePlan.keyProps) ? scenePlan.keyProps as string[] : base.keyProps,
+    emotionalEnergy: typeof scenePlan.emotionalPressure === 'number' ? scenePlan.emotionalPressure : base.emotionalEnergy
+  } as SceneGraphResponse['worldPlan'];
+}
+
+function applyDirectorIntentToScene(scene: SceneGraphResponse, intent?: DirectorIntent): SceneGraphResponse {
+  const adjustments = getDirectorIntentAdjustments(intent);
+  if (!adjustments) return scene;
+
+  return {
+    ...scene,
+    camera: {
+      ...scene.camera,
+      zoom: adjustments.cameraZoom
+    },
+    cinematicGrammar: {
+      ...scene.cinematicGrammar,
+      template: {
+        ...scene.cinematicGrammar.template,
+        spacingMultiplier: adjustments.spacingMultiplier,
+        motionEnergyScale: adjustments.motionEnergyScale,
+        pauseFrequency: adjustments.pauseFrequency,
+        contrastBoost: adjustments.contrastBoost,
+        headroom: adjustments.headroom
+      }
+    },
+    atmosphere: {
+      ...scene.atmosphere,
+      ambientIntensity: adjustments.ambientIntensity,
+      lightingTint: adjustments.lightingTint
+    },
+    rhythm: {
+      ...scene.rhythm,
+      pauseFrequencyPerMinute: adjustments.pauseFrequency
+    }
+  };
 }
 
 function createFallbackScene(prompt: string): SceneGraphResponse {
@@ -349,7 +448,11 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   };
 }
 
-function normalizeSceneGraph(scene: SceneGraphResponse, prompt: string): SceneGraphResponse {
+function normalizeSceneGraph(
+  scene: SceneGraphResponse,
+  prompt: string,
+  worldPlanOverride?: SceneGraphResponse['worldPlan']
+): SceneGraphResponse {
   const fallback = createFallbackScene(prompt);
 
   return {
@@ -363,7 +466,7 @@ function normalizeSceneGraph(scene: SceneGraphResponse, prompt: string): SceneGr
     atmosphere: scene.atmosphere ?? fallback.atmosphere,
     relationships: Array.isArray(scene.relationships) ? scene.relationships : fallback.relationships,
     rhythm: scene.rhythm ?? fallback.rhythm,
-    worldPlan: scene.worldPlan ?? fallback.worldPlan,
+    worldPlan: worldPlanOverride ?? scene.worldPlan ?? fallback.worldPlan,
   };
 }
 
