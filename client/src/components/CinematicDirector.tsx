@@ -186,11 +186,61 @@ export default function CinematicDirector() {
         }, `[director] directorial intensity: ${value}%`);
         break;
       }
-      case 'symbolicAbstraction':
-      case 'dialogueNaturalism':
-      case 'cinematicRealism':
-        // These controls influence future AI generation but don't directly modify runtime state
+      case 'symbolicAbstraction': {
+        // High abstraction → wide shot, high headroom, low contrast (dreamlike)
+        // Low abstraction → close-up, tight headroom, high contrast (literal/grounded)
+        const headroom = 0.7 + normalized * 0.9;
+        const contrastBoost = 0.6 - normalized * 0.5;
+        const zoom = 1.1 - normalized * 0.35;
+        sceneStore.applyPatch({
+          ...scene,
+          camera: { ...scene.camera, zoom },
+          cinematicGrammar: {
+            ...scene.cinematicGrammar,
+            template: {
+              ...scene.cinematicGrammar.template,
+              headroom,
+              contrastBoost
+            }
+          }
+        }, `[director] symbolic abstraction: ${value}%`);
         break;
+      }
+      case 'dialogueNaturalism': {
+        // High naturalism → slow pacing, long pauses, low motion energy (realistic delivery)
+        // Low naturalism → fast pacing, sharp motion, stylized
+        const pauseFreq = Math.round(2 + normalized * 10);
+        const motionScale = 1.4 - normalized * 0.8;
+        const tempo = normalized > 0.65 ? 'slow' : normalized < 0.35 ? 'fast' : 'medium';
+        sceneStore.applyPatch({
+          ...scene,
+          rhythm: { ...scene.rhythm, tempo, pauseFrequencyPerMinute: pauseFreq },
+          cinematicGrammar: {
+            ...scene.cinematicGrammar,
+            template: {
+              ...scene.cinematicGrammar.template,
+              motionEnergyScale: motionScale
+            }
+          }
+        }, `[director] dialogue naturalism: ${value}%`);
+        break;
+      }
+      case 'cinematicRealism': {
+        // High realism → neutral tint, full ambient, low contrast (grounded)
+        // Low realism → cold/warm tint, low ambient, high contrast (expressionistic)
+        const ambientIntensity = 0.4 + normalized * 0.6;
+        const contrastBoost = 0.7 - normalized * 0.65;
+        const tint = normalized > 0.6 ? 'rgba(0,0,0,0)' : normalized < 0.3 ? 'cold' : 'night';
+        sceneStore.applyPatch({
+          ...scene,
+          atmosphere: { ...scene.atmosphere, ambientIntensity, lightingTint: tint },
+          cinematicGrammar: {
+            ...scene.cinematicGrammar,
+            template: { ...scene.cinematicGrammar.template, contrastBoost }
+          }
+        }, `[director] cinematic realism: ${value}%`);
+        break;
+      }
     }
   }
 

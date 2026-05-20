@@ -99,7 +99,7 @@ export function updateExpressiveState(actor: Actor, deltaMs: number): Expressive
   }
 
   // Gaze behavior: add "looking away then looking back" hesitation pattern for tense emotions
-  if (emotion === 'nervous' || emotion === 'awkward' || emotion === 'tense') {
+  if (emotion === 'nervous' || emotion === 'awkward' || (emotion as string) === 'tense') {
     state.hesitationPhase += deltaMs / 2000; // ~2 second cycle
     const hesitationCycle = Math.sin(state.hesitationPhase * Math.PI);
     if (hesitationCycle > 0.7) {

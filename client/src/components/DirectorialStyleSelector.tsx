@@ -46,7 +46,7 @@ export default function DirectorialStyleSelector() {
         draft.visualStyle.grainIntensity = style.atmosphere.grainIntensity;
         draft.visualStyle.saturation = style.colorLanguage.saturation;
         draft.visualStyle.contrastBoost = style.lighting.contrastBoost;
-        draft.visualStyle.name = style.name;
+        draft.visualStyle.name = style.name as any;
       }
 
       // Apply cinematic grammar energy

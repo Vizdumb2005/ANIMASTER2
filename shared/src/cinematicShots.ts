@@ -174,3 +174,74 @@ export function getShotByStyle(style: ShotStyle): ShotDefinition | undefined {
 export function getAllShotStyles(): ShotDefinition[] {
   return [...SHOT_LIBRARY];
 }
+
+// Phase 9 - Shot-Based storytelling & narrative sequencing system
+
+export type ShotType =
+  | 'establishing'
+  | 'wide'
+  | 'medium'
+  | 'closeup'
+  | 'extreme_closeup'
+  | 'reaction'
+  | 'tracking'
+  | 'overhead'
+  | 'insert'
+  | 'isolation';
+
+export interface CinematicShot {
+  id: string;
+  shotType: ShotType;
+  emotionalIntent: string;
+  narrativePurpose: string;
+  framing: {
+    composition: string;
+    ruleOfThirds: boolean;
+    depthBias: number;
+    focalPriority: string[];
+  };
+  camera: {
+    angle: string;      // e.g. low, high, eye_level
+    movement: string;   // e.g. static, pan, tilt, tracking, push_in
+    lens: string;       // e.g. anamorphic, prime, wide_angle
+    distance: number;
+  };
+  pacing: {
+    duration: number;       // in seconds
+    intensity: number;      // 0 to 1
+    tensionCurve: number[]; // 0 to 1 tension points
+  };
+  atmosphere: {
+    lighting: string;
+    fogDensity: number;
+    ambience: string[];
+  };
+  continuity: {
+    previousShotRelation: string;
+    transitionType:
+      | 'cut'          // hard cut — abrupt change
+      | 'fade'         // fade to/from black
+      | 'dissolve'     // cross-dissolve overlap
+      | 'whip_pan'     // fast lateral pan
+      | 'smash_cut'    // jarring emotional punctuation
+      | 'silence_cut'  // cut into silence/stillness
+      | 'atmospheric_blend' // gradual atmospheric crossfade
+      | 'motion_continuation'; // camera carries motion across cut
+  };
+}
+
+export interface NarrativeState {
+  currentTheme: string;
+  emotionalTrajectory: string[];
+  continuityTracker: Record<string, any>;
+  motifOccurrences: Record<string, number>;
+}
+
+// Section 7 — Audio Atmosphere System
+export interface AtmosphereAudio {
+  ambience: string[];     // e.g. ['rain_heavy', 'distant_thunder', 'fluorescent_hum']
+  intensity: number;      // 0 to 1 — how prominent the sound is
+  spatialDepth: number;   // 0 to 1 — near (0) to far/environmental (1)
+  emotionalTone: string;  // e.g. 'grief', 'tension', 'isolation', 'warmth'
+}
+

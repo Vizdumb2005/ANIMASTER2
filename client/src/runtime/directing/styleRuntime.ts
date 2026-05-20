@@ -12,7 +12,7 @@ interface StyleTransitionState {
   };
   targetCamera: {
     mode?: string;
-    motionBias?: number;
+    shakeFactor?: number;
   };
   transitionDuration: number; // ms
   startTime: number;
@@ -32,7 +32,7 @@ export function applyStyleWithTransition(style: DirectorialStyle): void {
     },
     targetCamera: {
       mode: style.camera.preferredMode,
-      motionBias: style.camera.motionBias,
+      shakeFactor: style.camera.shakeFactor,
     },
     transitionDuration: 1500, // 1.5 second smooth transition
     startTime: Date.now(),

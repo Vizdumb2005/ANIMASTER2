@@ -319,20 +319,20 @@ export class AIOrchestrator {
 
   private getProviderOrder(complexity: TaskComplexity): ProviderName[] {
     if (this.config.preferredProvider) {
-      const rest: ProviderName[] = ['openai', 'anthropic', 'gemini', 'ollama', 'mock']
+      const rest: ProviderName[] = ['groq', 'openai', 'anthropic', 'gemini', 'ollama', 'mock']
         .filter(p => p !== this.config.preferredProvider) as ProviderName[];
       return [this.config.preferredProvider, ...rest];
     }
 
     // Route by complexity
     if (complexity === 'complex') {
-      return ['openai', 'anthropic', 'gemini', 'ollama', 'mock'];
+      return ['groq', 'openai', 'anthropic', 'gemini', 'ollama', 'mock'];
     }
     if (complexity === 'moderate') {
-      return ['gemini', 'openai', 'ollama', 'anthropic', 'mock'];
+      return ['groq', 'gemini', 'openai', 'ollama', 'anthropic', 'mock'];
     }
     // Low complexity: prefer local/cheap
-    return ['ollama', 'gemini', 'mock', 'openai', 'anthropic'];
+    return ['groq', 'ollama', 'gemini', 'mock', 'openai', 'anthropic'];
   }
 
   private assessComplexity(intent: CinematicIntent, prompt: string): TaskComplexity {

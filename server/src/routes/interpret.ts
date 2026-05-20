@@ -9,6 +9,7 @@ import {
   sceneGenerationSystemPrompt
 } from '../prompts/sceneGenerationPrompt.js';
 import { planScene } from '../planning/scenePlanner.js';
+import { generateShotSequence } from '../planning/shotSequencer.js';
 
 type SceneGraphResponse = {
   id: string;
@@ -180,7 +181,7 @@ async function interpretPrompt(prompt: string, directing?: DirectingContext): Pr
 
 type SceneOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateSceneGeneration>>;
 
-const PROVIDER_NAMES: ProviderName[] = ['openai', 'anthropic', 'gemini', 'ollama', 'mock'];
+const PROVIDER_NAMES: ProviderName[] = ['groq', 'openai', 'anthropic', 'gemini', 'ollama', 'mock'];
 
 function isProviderName(value: string): value is ProviderName {
   return PROVIDER_NAMES.includes(value as ProviderName);
@@ -445,15 +446,21 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
     },
     // Phase 6: Generate semantic world plan
     worldPlan: planScene(prompt, actors.length) as SceneGraphResponse['worldPlan'],
+    // Phase 9
+    ...generateShotSequence(prompt, actors as any),
   };
 }
 
 function normalizeSceneGraph(
-  scene: SceneGraphResponse,
+  scene: SceneGraphResponse & { shotSequence?: any[]; narrativeState?: any },
   prompt: string,
   worldPlanOverride?: SceneGraphResponse['worldPlan']
-): SceneGraphResponse {
+): SceneGraphResponse & { shotSequence?: any[]; narrativeState?: any } {
   const fallback = createFallbackScene(prompt);
+
+  const shotsInfo = (scene.shotSequence && scene.shotSequence.length > 0)
+    ? { shotSequence: scene.shotSequence, narrativeState: scene.narrativeState }
+    : generateShotSequence(prompt, (scene.actors || fallback.actors) as any);
 
   return {
     id: typeof scene.id === 'string' ? scene.id : fallback.id,
@@ -467,6 +474,8 @@ function normalizeSceneGraph(
     relationships: Array.isArray(scene.relationships) ? scene.relationships : fallback.relationships,
     rhythm: scene.rhythm ?? fallback.rhythm,
     worldPlan: worldPlanOverride ?? scene.worldPlan ?? fallback.worldPlan,
+    shotSequence: shotsInfo.shotSequence,
+    narrativeState: shotsInfo.narrativeState,
   };
 }
 

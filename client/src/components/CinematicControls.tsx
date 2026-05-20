@@ -11,7 +11,7 @@ export default function CinematicControls() {
 
   function applyControl(key: string, value: number) {
     const scene = sceneStore.getScene();
-    if (scene.version === 0) return;
+    if (scene.actors.length === 0) return;
 
     switch (key) {
       case 'pacing': {

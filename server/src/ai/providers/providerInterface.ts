@@ -92,7 +92,7 @@ export interface AIProvider {
   summarizeSceneMemory(sceneJson: string): Promise<AICompletionResponse>;
 }
 
-export type ProviderName = 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
+export type ProviderName = 'groq' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
 
 export type TaskComplexity = 'simple' | 'moderate' | 'complex';
 

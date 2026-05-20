@@ -54,8 +54,8 @@ export default function DirectedFeedback({ maxEntries = 3 }: DirectedFeedbackPro
     };
 
     // Listen for mutation events from liveMutationEngine
-    window.addEventListener('scene:mutate', handleMutation as EventListener);
-    return () => window.removeEventListener('scene:mutate', handleMutation as EventListener);
+    window.addEventListener('scene:mutate', handleMutation as any);
+    return () => window.removeEventListener('scene:mutate', handleMutation as any);
   }, [scene, previousSnapshot, maxEntries]);
 
   if (!visible || entries.length === 0) return null;

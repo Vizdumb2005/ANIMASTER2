@@ -238,7 +238,7 @@ export const DEMO_SCENES: DemoScene[] = [
       intimacy: 0.3,
       dominance: 0.2,
       emotional_distance: 0.5,
-      socialTension: 0.8,
+      social_tension: 0.8,
       vulnerability: 0.4,
       isolation: 0.2
     },

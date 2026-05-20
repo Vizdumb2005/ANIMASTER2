@@ -1,3 +1,5 @@
+import { CinematicShot, NarrativeState } from './cinematicShots';
+
 export type Vector2 = {
   x: number;
   y: number;
@@ -283,8 +285,10 @@ export type ShotIntentType = 'establish' | 'reveal' | 'emphasize' | 'isolate' | 
 
 export interface ShotIntent {
   intent: ShotIntentType;
-  subject: string;
-  intensity: number;
+  subject?: string;
+  intensity?: number;
+  targetSubjectId?: string;
+  transitionSpeed?: number;
 }
 
 // --- Phase 2.6: Attention Focus ---
@@ -586,4 +590,11 @@ export interface SceneGraph {
   worldLayout?: WorldLayout;
   visualStyle?: VisualStyleProfile;
   environmentInfluence?: EnvironmentCinematicInfluence;
+  // Phase 9
+  shotSequence?: CinematicShot[];
+  narrativeState?: NarrativeState;
+  activeShotId?: string;
+  shotElapsedMs?: number;
+  timelineTimeMs?: number;
+  isTimelinePlaying?: boolean;
 }

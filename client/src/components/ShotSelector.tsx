@@ -39,7 +39,7 @@ export default function ShotSelector() {
       }
       // Update shot intent for runtime
       draft.shotIntent = {
-        intent: shot.framingIntent,
+        intent: shot.framingIntent as any,
         targetSubjectId: draft.actors[0]?.id,
         transitionSpeed: shot.transitionSpeed,
       };

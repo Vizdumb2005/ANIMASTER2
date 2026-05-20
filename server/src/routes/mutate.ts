@@ -172,7 +172,7 @@ async function mutateScene(prompt: string, currentScene: unknown, directing?: Di
 
 type MutationOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateMutation>>;
 
-const PROVIDER_NAMES: ProviderName[] = ['openai', 'anthropic', 'gemini', 'ollama', 'mock'];
+const PROVIDER_NAMES: ProviderName[] = ['groq', 'openai', 'anthropic', 'gemini', 'ollama', 'mock'];
 
 function isProviderName(value: string): value is ProviderName {
   return PROVIDER_NAMES.includes(value as ProviderName);

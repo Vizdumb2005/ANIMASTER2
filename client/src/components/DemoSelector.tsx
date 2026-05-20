@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { fetchDemos, type DemoExperience } from '../services/aiService';
 import { interpretScene } from '../services/interpretService';
+import { mutateScene } from '../services/mutateService';
 import { sceneStore } from '../store/sceneStore';
 import { initActorJoints } from '../runtime/initActorJoints';
 
@@ -13,6 +14,7 @@ export default function DemoSelector() {
   const [loading, setLoading] = useState(false);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
   const [mutationIndex, setMutationIndex] = useState(0);
+  const [applyingMutation, setApplyingMutation] = useState(false);
 
   useEffect(() => {
     if (!collapsed && demos.length === 0) {
@@ -43,6 +45,22 @@ export default function DemoSelector() {
       // Fallback handled by interpret route
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function applyMutation(mutation: DemoExperience['mutations'][number], index: number) {
+    if (applyingMutation || index !== mutationIndex) return;
+    setApplyingMutation(true);
+    try {
+      const currentScene = sceneStore.getScene();
+      const directing = sceneStore.getDirectingContext();
+      const patch = await mutateScene(mutation.prompt, currentScene, directing);
+      sceneStore.applyPatch(patch, mutation.prompt);
+      setMutationIndex(index + 1);
+    } catch {
+      // Fallback handled by mutate route
+    } finally {
+      setApplyingMutation(false);
     }
   }
 
@@ -84,13 +102,29 @@ export default function DemoSelector() {
               <p className="demo-card-desc">{demo.description}</p>
               {activeDemo === demo.id && currentDemo && (
                 <div className="demo-mutations">
-                  <p className="demo-mutations-label">Suggested mutations:</p>
+                  <p className="demo-mutations-label">Scene mutations:</p>
                   {currentDemo.mutations.map((m, i) => (
-                    <div key={i} className={`demo-mutation ${i < mutationIndex ? 'done' : i === mutationIndex ? 'next' : ''}`}>
-                      <span className="demo-mutation-prompt">&ldquo;{m.prompt}&rdquo;</span>
+                    <div key={i} className={`demo-mutation ${i < mutationIndex ? 'done' : i === mutationIndex ? 'next' : 'pending'}`}>
+                      <div className="demo-mutation-row">
+                        <span className="demo-mutation-prompt">&ldquo;{m.prompt}&rdquo;</span>
+                        {i === mutationIndex && (
+                          <button
+                            className="demo-mutation-apply-btn"
+                            onClick={() => applyMutation(m, i)}
+                            disabled={applyingMutation}
+                            type="button"
+                          >
+                            {applyingMutation ? '…' : 'Apply'}
+                          </button>
+                        )}
+                        {i < mutationIndex && <span className="demo-mutation-done-mark">✓</span>}
+                      </div>
                       <span className="demo-mutation-effect">{m.expectedEffect}</span>
                     </div>
                   ))}
+                  {mutationIndex >= currentDemo.mutations.length && (
+                    <p className="demo-complete">All mutations applied ✓</p>
+                  )}
                 </div>
               )}
             </div>

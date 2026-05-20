@@ -7,7 +7,13 @@
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"],
-    "noEmit": false
+    "noEmit": false,
+    "baseUrl": "..",
+    "paths": {
+      "@animaster/shared/*": ["shared/src/*"],
+      "@animaster/client/*": ["client/src/*"],
+      "@animaster/server/*": ["server/src/*"]
+    }
   },
   "include": ["src"]
 }

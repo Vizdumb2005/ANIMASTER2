@@ -1,6 +1,7 @@
 // Phase 7 — Task Group 1: Provider Registry
 
 import type { AIProvider, AIProviderConfig, ProviderName, ProviderCapabilities } from './providerInterface.js';
+import { GroqProvider } from './groqProvider.js';
 import { OpenAIProvider } from './openaiProvider.js';
 import { AnthropicProvider } from './anthropicProvider.js';
 import { GeminiProvider } from './geminiProvider.js';
@@ -8,6 +9,15 @@ import { OllamaProvider } from './ollamaProvider.js';
 import { MockProvider } from './mockProvider.js';
 
 const CAPABILITIES: Record<ProviderName, ProviderCapabilities> = {
+  groq: {
+    maxContextTokens: 32_768,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    reasoningStrength: 'strong',
+    latencyProfile: 'fast',
+    costTier: 'cheap',
+    isLocal: false
+  },
   openai: {
     maxContextTokens: 128_000,
     supportsJsonMode: true,
@@ -61,6 +71,13 @@ class ProviderRegistry {
 
   async initializeFromEnv(): Promise<void> {
     if (this.initialized) return;
+
+    const groq = new GroqProvider();
+    await groq.initialize({
+      apiKey: process.env.GROQ_API_KEY,
+      model: process.env.GROQ_MODEL
+    });
+    this.providers.set('groq', groq);
 
     const openai = new OpenAIProvider();
     await openai.initialize({
@@ -118,7 +135,7 @@ class ProviderRegistry {
       if (available.includes('ollama')) return this.providers.get('ollama')!;
     }
 
-    const priority: ProviderName[] = ['openai', 'anthropic', 'gemini', 'ollama', 'mock'];
+    const priority: ProviderName[] = ['groq', 'openai', 'anthropic', 'gemini', 'ollama', 'mock'];
     for (const name of priority) {
       if (available.includes(name)) return this.providers.get(name)!;
     }
@@ -130,11 +147,13 @@ class ProviderRegistry {
     const available = this.getAvailableProviders();
 
     if (complexity === 'simple') {
+      if (available.includes('groq')) return this.providers.get('groq')!;
       if (available.includes('ollama')) return this.providers.get('ollama')!;
       if (available.includes('gemini')) return this.providers.get('gemini')!;
     }
 
     if (complexity === 'complex') {
+      if (available.includes('groq')) return this.providers.get('groq')!;
       if (available.includes('anthropic')) return this.providers.get('anthropic')!;
       if (available.includes('openai')) return this.providers.get('openai')!;
     }

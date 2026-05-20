@@ -23,10 +23,12 @@
 15. [Emotion System](#15-emotion-system)
 16. [Camera System](#16-camera-system)
 17. [Atmosphere & Environment System](#17-atmosphere--environment-system)
-18. [Phase Progression](#18-phase-progression)
-19. [API Reference](#19-api-reference)
-20. [Development Workflow](#20-development-workflow)
-21. [Glossary](#21-glossary)
+18. [Scene Series Feature](#18-scene-series-feature)
+19. [Demo System](#19-demo-system)
+20. [AI Provider System](#20-ai-provider-system)
+21. [API Reference](#21-api-reference)
+22. [Development Workflow](#22-development-workflow)
+23. [Glossary](#23-glossary)
 
 ---
 
@@ -35,10 +37,11 @@
 Animaster is **not** an animation editor, timeline tool, or Blender alternative. It is a **semantic cinematic creation platform** where:
 
 - Users describe scenes using natural language prompts
-- An LLM (or regex-based fallback) interprets the prompt into a semantic scene graph
+- An LLM (Groq, OpenAI, Anthropic, Gemini, or local Ollama) interprets the prompt into a semantic scene graph
 - A deterministic runtime evaluates the scene graph every frame at 60 FPS
 - A Three.js/React Three Fiber renderer visualizes the scene with cinematic lighting, atmosphere, and post-processing
 - Users can mutate scenes conversationally ("make it lonelier", "add rain", "make him nervous")
+- Users can build **scene series** — sequences of scenes that form a narrative arc
 
 The system feels like **directing a movie through language** — all editing happens through natural language prompts and semantic controls (sliders for pacing/tension/atmosphere), never through manual animation curves or keyframes.
 
@@ -51,8 +54,19 @@ The system feels like **directing a movie through language** — all editing hap
 | Post-Processing | @react-three/postprocessing 3, postprocessing 6 |
 | State Management | Custom reactive store (pub/sub pattern) |
 | Server | Express 4, TypeScript, tsx (dev) |
-| AI | OpenAI API (gpt-4o-mini) with regex fallback |
+| AI | Groq API (qwen/qwen3-32b) with multi-provider fallback |
 | Shared Types | TypeScript monorepo workspace (`@animaster/shared`) |
+
+### Key Features
+
+- **Natural Language Scene Generation** — Describe any scene, get a fully populated scene graph
+- **Conversational Mutation** — "make it lonelier", "add rain", "push camera closer"
+- **Cinematic Director Controls** — 9 semantic sliders (Emotional Intensity, Visual Density, Symbolic Abstraction, etc.)
+- **Scene Series** — Build multi-scene narratives with navigation
+- **Demo Experiences** — Pre-built scenarios with step-by-step mutation guides
+- **Real-time 60 FPS Runtime** — 25+ evaluator modules computing acting, camera, tension, arcs
+- **Atmospheric Effects** — Rain, fog, flicker, dust, snow, embers
+- **Procedural Environments** — 18+ location types with semantic world generation
 
 ---
 
@@ -83,31 +97,65 @@ The system feels like **directing a movie through language** — all editing hap
 ## 3. Architecture Overview
 
 ```
-+------------------+     HTTP      +------------------+
-|                  | ------------> |                  |
-|   Client (Vite)  |   /interpret  |  Server (Express)|
-|   localhost:5173  |   /mutate     |  localhost:3001   |
-|                  | <------------ |                  |
-+------------------+     JSON      +------------------+
-        |                                   |
-        |                                   |
-   +----v----+                        +-----v-----+
-   | Scene   |                        |  OpenAI   |
-   | Store   |                        |  API      |
-   +---------+                        |  (or      |
-        |                             |  fallback)|
-   +----v----+                        +-----------+
-   | Runtime |
-   | Systems |
-   | (25+    |
-   | modules)|
-   +---------+
-        |
-   +----v--------+
-   | Three.js    |
-   | R3F Renderer|
-   | (8 comps)   |
-   +-------------+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT (localhost:5173)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │   App.tsx   │───▶│  PromptBar  │───▶│ SceneStore  │───▶│  TickLoop   │  │
+│  └─────────────┘    └─────────────┘    └──────┬──────┘    └──────┬──────┘  │
+│         │                                     │                   │         │
+│         ▼                                     ▼                   ▼         │
+│  ┌─────────────┐    ┌─────────────────────────────────────────────────┐    │
+│  │    UI       │    │              RUNTIME EVALUATORS                 │    │
+│  │ Components  │    │  ┌─────────┐ ┌─────────┐ ┌─────────┐           │    │
+│  │             │    │  │ Staging │ │ Camera  │ │ Acting  │ ...25+    │    │
+│  │ • Director  │    │  └─────────┘ └─────────┘ └─────────┘           │    │
+│  │ • Controls  │    │  ┌─────────┐ ┌─────────┐ ┌─────────┐           │    │
+│  │ • Series    │    │  │ Tension │ │  Arcs   │ │ Reactions│          │    │
+│  │ • Demos     │    │  └─────────┘ └─────────┘ └─────────┘           │    │
+│  └─────────────┘    └─────────────────────────────────────────────────┘    │
+│         │                                     │                             │
+│         ▼                                     ▼                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                    THREE.JS / R3F RENDERER                          │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │   │
+│  │  │ Environment  │ │  Characters  │ │  Atmosphere  │                │   │
+│  │  │    Mesh      │ │    Mesh      │ │   Effects    │                │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘                │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │   │
+│  │  │   Lighting   │ │    Props     │ │   Post-FX    │                │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘                │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ HTTP/WebSocket
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             SERVER (localhost:3001)                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │  /interpret │    │   /mutate   │    │ /live-mutate│    │    /ai      │  │
+│  │   Route     │    │   Route     │    │   Route     │    │   Route     │  │
+│  └──────┬──────┘    └──────┬──────┘    └─────────────┘    └─────────────┘  │
+│         │                  │                                               │
+│         ▼                  ▼                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      AI ORCHESTRATOR                                 │   │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │   │
+│  │  │   Intent    │ │   Agents    │ │   Context   │ │   Memory    │   │   │
+│  │  │  Compiler   │ │ (6 agents)  │ │  Assembler  │ │   System    │   │   │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      PROVIDER REGISTRY                               │   │
+│  │  ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐      │   │
+│  │  │ Groq  │ │OpenAI │ │Anthropic│ │Gemini │ │Ollama │ │ Mock  │      │   │
+│  │  │(qwen) │ │(gpt-4)│ │(claude)│ │(gemini)│ │(local)│ │(regex)│      │   │
+│  │  └───────┘ └───────┘ └───────┘ └───────┘ └───────┘ └───────┘      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Monorepo Structure
@@ -126,7 +174,7 @@ The project is a TypeScript monorepo with three packages:
 
 - Node.js 18+ (LTS recommended)
 - npm 9+
-- (Optional) OpenAI API key for AI-powered scene generation
+- (Optional) Groq API key for AI-powered scene generation
 
 ### Installation
 
@@ -160,13 +208,18 @@ npx vite --host 0.0.0.0
 Create a `.env` file in `server/`:
 
 ```env
-# Optional — without this, the regex-based fallback is used
-OPENAI_API_KEY=sk-...
+# Primary AI provider — Groq (qwen/qwen3-32b)
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=qwen/qwen3-32b
 
-# Optional — defaults to gpt-4o-mini
-OPENAI_MODEL=gpt-4o-mini
+# Fallback providers (optional)
+# OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini
+# ANTHROPIC_API_KEY=...
+# GEMINI_API_KEY=...
+# OLLAMA_URL=http://localhost:11434
+# OLLAMA_MODEL=llama3
 
-# Optional — defaults to 3001
 PORT=3001
 ```
 
@@ -190,19 +243,50 @@ cd client && npm run build    # tsc --noEmit + vite build → dist/
 ANIMASTER2/
 ├── shared/
 │   ├── src/
-│   │   └── scene.ts              # 507 lines — ALL shared type definitions
+│   │   └── scene.ts              # 500+ lines — ALL shared type definitions
 │   ├── package.json
 │   └── tsconfig.json
 │
 ├── server/
 │   ├── src/
-│   │   ├── index.ts              # Express app entry point
+│   │   ├── index.ts              # Express app entry point + WebSocket
 │   │   ├── routes/
 │   │   │   ├── interpret.ts      # POST /interpret — scene generation
-│   │   │   └── mutate.ts         # POST /mutate — scene mutation
-│   │   └── prompts/
-│   │       ├── sceneGenerationPrompt.ts
-│   │       └── sceneMutationPrompt.ts
+│   │   │   ├── mutate.ts         # POST /mutate — scene mutation
+│   │   │   ├── liveMutate.ts     # Real-time mutation via WebSocket
+│   │   │   └── ai.ts             # AI status & control endpoints
+│   │   ├── prompts/
+│   │   │   ├── sceneGenerationPrompt.ts
+│   │   │   └── sceneMutationPrompt.ts
+│   │   ├── planning/
+│   │   │   └── scenePlanner.ts   # Regex-based scene planning fallback
+│   │   ├── memory/
+│   │   │   └── sceneMemory.ts    # In-memory scene history
+│   │   └── ai/
+│   │       ├── providers/        # AI provider implementations
+│   │       │   ├── groqProvider.ts      # Groq (qwen/qwen3-32b) ⭐ PRIMARY
+│   │       │   ├── openaiProvider.ts
+│   │       │   ├── anthropicProvider.ts
+│   │       │   ├── geminiProvider.ts
+│   │       │   ├── ollamaProvider.ts
+│   │       │   ├── mockProvider.ts
+│   │       │   ├── providerInterface.ts
+│   │       │   └── providerRegistry.ts
+│   │       ├── runtime/
+│   │       │   └── orchestrator.ts      # AI task routing & provider selection
+│   │       ├── compiler/
+│   │       │   └── intentCompiler.ts    # Prompt → CinematicIntent
+│   │       ├── context/
+│   │       │   ├── contextAssembler.ts
+│   │       │   └── contextCompression.ts
+│   │       └── agents/           # 6 cinematic agents
+│   │           ├── cinematographerAgent.ts
+│   │           ├── environmentAgent.ts
+│   │           ├── emotionalArcAgent.ts
+│   │           ├── blockingAgent.ts
+│   │           ├── dialogueAgent.ts
+│   │           ├── lightingAgent.ts
+│   │           └── continuityAgent.ts
 │   ├── package.json
 │   └── tsconfig.json
 │
@@ -210,100 +294,137 @@ ANIMASTER2/
 │   ├── src/
 │   │   ├── App.tsx               # Root component
 │   │   ├── main.tsx              # React entry point
-│   │   ├── styles.css            # 716 lines — all UI styles
+│   │   ├── styles.css            # All UI styles (700+ lines)
 │   │   │
-│   │   ├── components/           # UI components
-│   │   │   ├── PromptBar.tsx
-│   │   │   ├── SessionSidebar.tsx
-│   │   │   ├── DebugPanel.tsx
-│   │   │   ├── CinematicControls.tsx
-│   │   │   ├── PlaybackControls.tsx
-│   │   │   ├── CameraPresets.tsx
-│   │   │   ├── ActorDirector.tsx
-│   │   │   ├── SceneInfoOverlay.tsx
-│   │   │   ├── BeatTimeline.tsx
-│   │   │   ├── SceneGraphView.tsx
-│   │   │   └── PromptSuggestions.tsx
+│   │   ├── components/           # UI components (20+ files)
+│   │   │   ├── PromptBar.tsx           # Main input + scene creation
+│   │   │   ├── CinematicControls.tsx   # Semantic sliders
+│   │   │   ├── CinematicDirector.tsx   # 9 director controls
+│   │   │   ├── SceneSeriesPanel.tsx    # Scene series builder
+│   │   │   ├── DemoSelector.tsx        # Demo experiences + mutations
+│   │   │   ├── SessionSidebar.tsx      # Prompt history
+│   │   │   ├── PlaybackControls.tsx    # Play/pause/speed
+│   │   │   ├── CameraPresets.tsx       # Shot buttons
+│   │   │   ├── ActorDirector.tsx       # Per-actor emotion control
+│   │   │   ├── BeatTimeline.tsx        # Beat visualization
+│   │   │   ├── SceneGraphView.tsx      # Debug scene inspector
+│   │   │   └── ...more
 │   │   │
 │   │   ├── services/             # API communication
 │   │   │   ├── interpretService.ts
-│   │   │   └── mutateService.ts
+│   │   │   ├── mutateService.ts
+│   │   │   └── aiService.ts
 │   │   │
 │   │   ├── store/
-│   │   │   └── sceneStore.ts     # Central state management (287 lines)
+│   │   │   └── sceneStore.ts     # Central state (350+ lines)
+│   │   │                         # - Scene graph + series management
+│   │   │                         # - Director intent tracking
+│   │   │                         # - Pub/sub listeners
 │   │   │
 │   │   ├── runtime/              # 25+ runtime evaluator modules
-│   │   │   ├── tickLoop.ts
-│   │   │   ├── sceneEvaluator.ts
-│   │   │   ├── actorEvaluator.ts
-│   │   │   ├── actionRuntime.ts
-│   │   │   ├── cinematicGrammarRegistry.ts
-│   │   │   ├── semanticProfiles.ts
-│   │   │   ├── semanticOperations.ts
-│   │   │   ├── semanticAnchors.ts
-│   │   │   ├── deterministicRandom.ts
-│   │   │   ├── initActorJoints.ts
-│   │   │   ├── proximityAwareness.ts
-│   │   │   ├── acting/
-│   │   │   ├── anchors/
-│   │   │   ├── anticipation/
-│   │   │   ├── arcs/
-│   │   │   ├── attention/
-│   │   │   ├── beats/
-│   │   │   ├── behaviors/
-│   │   │   ├── camera/
-│   │   │   ├── composition/
-│   │   │   ├── continuity/
-│   │   │   ├── dynamics/
-│   │   │   ├── emotions/
-│   │   │   ├── environment/
-│   │   │   ├── evolution/
-│   │   │   ├── poses/
-│   │   │   ├── reactions/
-│   │   │   ├── rhythm/
-│   │   │   ├── spatial/
-│   │   │   ├── staging/
-│   │   │   ├── tension/
-│   │   │   ├── timing/
-│   │   │   └── validation/
+│   │   │   ├── tickLoop.ts       # 60 FPS fixed timestep loop
+│   │   │   ├── sceneEvaluator.ts # Main scene evaluation orchestrator
+│   │   │   ├── actorEvaluator.ts # Per-actor tick evaluation
+│   │   │   ├── actionRuntime.ts  # Action queue processing
+│   │   │   │
+│   │   │   ├── behaviors/        # idle, walk, sit, pace, approach
+│   │   │   ├── acting/           # deepActing, hesitation, weightShift
+│   │   │   ├── camera/           # cameraRuntime, shotIntent, intentDriven
+│   │   │   ├── beats/            # beatSequence, beatActing, beatCamera
+│   │   │   ├── arcs/             # emotionalArc templates + evaluator
+│   │   │   ├── emotions/         # emotion modifiers per emotion
+│   │   │   ├── tension/          # tensionAccumulator, compression
+│   │   │   ├── reactions/        # reactionTrigger, reactionRunner
+│   │   │   ├── staging/          # stagingEvaluator, stagingRules
+│   │   │   ├── continuity/       # continuityTracker, emotionalAftermath
+│   │   │   ├── world/            # proceduralWorldGenerator
+│   │   │   └── ...30+ more modules
 │   │   │
 │   │   └── three/                # Three.js/R3F rendering layer
 │   │       ├── components/
-│   │       │   ├── CinematicScene.tsx
-│   │       │   ├── CharacterMesh.tsx
-│   │       │   ├── EnvironmentMesh.tsx
+│   │       │   ├── CinematicScene.tsx  # Main canvas + tick loop
+│   │       │   ├── CharacterMesh.tsx   # Stickman renderer
+│   │       │   ├── EnvironmentMesh.tsx # Room/world geometry
 │   │       │   ├── AtmosphereEffects.tsx
 │   │       │   ├── SceneLighting.tsx
-│   │       │   ├── SceneCamera.tsx
-│   │       │   ├── SceneProps.tsx
-│   │       │   └── ScenePostProcessing.tsx
-│   │       ├── assets/
-│   │       ├── atmosphere/
-│   │       ├── audio/
-│   │       ├── camera/
-│   │       ├── postprocessing/
-│   │       ├── store/
-│   │       └── index.ts
+│   │       │   ├── ScenePostProcessing.tsx
+│   │       │   └── ...more
+│   │       ├── effects/          # rain, fog, flicker, bloom, vignette
+│   │       ├── environments/     # environmentRenderer, parallaxSystem
+│   │       └── postprocessing/   # CinematicEffects pipeline
 │   │
-│   ├── package.json
-│   └── tsconfig.json
-│
-└── package.json                  # Root workspace config
+│   └── package.json
 ```
-
 ---
 
 ## 6. Shared Types (`shared/`)
 
-**File**: `shared/src/scene.ts` (507 lines)
-
-This is the single source of truth for all TypeScript type definitions used by both client and server. Every data structure in the system is defined here.
+The `shared` package contains **all** type definitions used by both client and server. This ensures type safety across the API boundary.
 
 ### Core Types
 
-#### SceneGraph (root type)
-
 ```typescript
+// Actor types
+type ActorEmotion = 'neutral' | 'sad' | 'happy' | 'nervous' | 'excited' | 'awkward' | 'angry' | 'exhausted';
+type ActorAction = 'idle' | 'walking' | 'sitting' | 'approaching' | 'pacing';
+
+interface Actor {
+  id: string;
+  label: string;
+  type: 'humanoid';
+  position: Vector2;
+  targetPosition: Vector2 | null;
+  emotionState: ActorEmotion;
+  emotionIntensity?: number;
+  currentAction: ActorAction;
+  actionQueue: ActorAction[];       // Sequential actions to execute
+  activeAction?: ActionInstance | null;
+  joints: StickmanJoints;
+  actingState?: ActingState;
+  actionElapsed: number;
+}
+
+// Environment types
+type LocationType = 'subway' | 'alley' | 'rooftop' | 'forest' | 'beach' | 
+                    'apartment' | 'hallway' | 'hospital' | 'parking_garage' |
+                    'diner' | 'office' | 'warehouse' | 'indoor_room' |
+                    'outdoor_street' | 'outdoor_park' | 'outdoor_beach' |
+                    'outdoor_forest' | 'staircase';
+
+interface Environment {
+  type: LocationType;
+  backgroundColor: string;
+  floorColor: string;
+  wallColor: string;
+  width: number;   // 960
+  height: number;  // 540
+}
+
+// Cinematic grammar
+type SceneTone = 'neutral' | 'sad' | 'tense' | 'lonely' | 'awkward' | 'energetic' | 'romantic' | 'threatening';
+type CameraMode = 'static' | 'follow' | 'close_up' | 'wide_shot' | 'over_the_shoulder' | 'dramatic_zoom' | 'tension';
+
+interface CinematicGrammar {
+  tone: SceneTone;
+  template: CinematicTemplate;  // cameraMode, spacingMultiplier, motionEnergyScale, etc.
+}
+
+// Atmosphere
+type AtmosphereEffect = 'rain' | 'fog' | 'flicker' | 'dust' | 'snow' | 'embers' | 'none';
+interface AtmosphereProfile {
+  effects: AtmosphereEffect[];
+  lightingTint: string;      // 'warm', 'cold', 'night', 'rgba(0,0,0,0)'
+  ambientIntensity: number;  // 0-1
+}
+
+// Rhythm
+interface SceneRhythm {
+  tempo: 'slow' | 'medium' | 'fast';
+  pauseFrequencyPerMinute: number;
+  motionEnergyCurve: 'linear' | 'ease-in' | 'ease-out' | 'sharp';
+}
+
+// The complete SceneGraph (500+ lines of types)
 interface SceneGraph {
   id: string;
   version: number;
@@ -320,7 +441,8 @@ interface SceneGraph {
   relationships: CharacterRelationship[];
   rhythm: SceneRhythm;
   continuity?: ContinuityState;
-  // Phase 2.6 computed fields
+  
+  // Phase 2.6 runtime fields (computed each tick)
   emotionalSpatial?: EmotionalSpatialState;
   dramaticBeats?: DramaticBeat[];
   shotIntent?: ShotIntent;
@@ -329,1136 +451,730 @@ interface SceneGraph {
   powerDynamics?: PowerDynamic[];
   tensionState?: TensionState;
   anticipationState?: AnticipationState;
-  // Phase 2.7 computed fields
+  
+  // Phase 2.7 runtime fields
   beatSequence?: BeatSequence;
   emotionalArc?: EmotionalArc;
   reactionChains?: ReactionChain[];
   storyAnchors?: StoryAnchor[];
   sceneEvolution?: SceneEvolution;
   cinematicMomentScore?: CinematicMomentScore;
-  // Phase 3 computed fields
-  environmentReaction?: { ... };
+  
+  // Phase 6 world generation
+  worldPlan?: SemanticWorldPlan;
+  worldLayout?: WorldLayout;
+  visualStyle?: VisualStyleProfile;
 }
 ```
 
-#### Actor
+### Scene Series Types (client extension)
 
 ```typescript
-interface Actor {
+type SceneSeries = {
   id: string;
-  label: string;
-  type: 'humanoid';
-  position: Vector2;
-  targetPosition: Vector2 | null;
-  emotionState: ActorEmotion;        // 'neutral'|'sad'|'happy'|'nervous'|'excited'|'awkward'|'angry'|'exhausted'
-  emotionIntensity?: number;
-  currentAction: ActorAction;        // 'idle'|'walking'|'sitting'|'approaching'|'pacing'
-  actionQueue: ActorAction[];
-  activeAction?: ActionInstance;
-  actionPlan?: ActionInstance[];
-  joints: StickmanJoints;
-  actingState?: ActingState;
-  actionElapsed: number;
-  emotionalMomentum?: number;
-}
+  title: string;
+  scenes: SceneGraph[];      // Array of complete scene graphs
+  activeIndex: number;       // Currently viewing scene index
+};
+
+type DirectorIntent = Record<string, number>;  // 0-1 normalized values
+type ActorOverride = { actorId: string; emotion: ActorEmotion; intensity?: number };
+type DirectingContext = {
+  directorIntent: DirectorIntent;
+  actorOverrides: ActorOverride[];
+  beatSequence?: BeatSequenceContext;
+};
 ```
-
-#### ActionInstance (Phase 2.5 semantic actions)
-
-```typescript
-interface ActionInstance {
-  id: string;
-  type: ActionType;                  // 'idle'|'waiting'|'walkingTo'|'approaching'|'sittingDown'|'seated'|'lookingAt'|'hesitating'|'pacing'
-  target: ActionTarget | null;      // position, anchor, actor, or none
-  semanticReason: string;
-  phase: ActionPhase;               // 'queued'|'starting'|'executing'|'settling'|'sustained'|'completed'|'interrupted'|'failed'
-  startedAt: number;
-  duration: number | null;
-  priority: number;
-  interruptible: boolean;
-  status: ActionStatus;
-}
-```
-
-#### Environment
-
-```typescript
-interface Environment {
-  type: string;                      // 'indoor_room'|'outdoor_park'|'rooftop'|'hospital'|'subway'|etc.
-  backgroundColor: string;
-  floorColor: string;
-  wallColor: string;
-  width: number;                     // default 960
-  height: number;                    // default 540
-}
-```
-
-#### Camera
-
-```typescript
-type CameraMode = 'static' | 'follow' | 'close_up' | 'wide_shot' | 'over_the_shoulder' | 'dramatic_zoom' | 'tension';
-
-interface Camera {
-  x: number;
-  y: number;
-  zoom: number;
-  mode: CameraMode;
-  plan?: CameraPlan | null;
-  shot?: ShotState;
-}
-```
-
-#### CinematicGrammar
-
-```typescript
-type SceneTone = 'neutral' | 'sad' | 'tense' | 'lonely' | 'awkward' | 'energetic' | 'romantic' | 'threatening';
-
-interface CinematicGrammar {
-  tone: SceneTone;
-  template: CinematicTemplate;
-}
-
-interface CinematicTemplate {
-  cameraMode: CameraMode;
-  spacingMultiplier: number;
-  motionEnergyScale: number;
-  pauseFrequency: number;
-  contrastBoost: number;
-  headroom: number;
-}
-```
-
-#### AtmosphereProfile
-
-```typescript
-type AtmosphereEffect = 'rain' | 'fog' | 'flicker' | 'dust' | 'snow' | 'embers' | 'none';
-
-interface AtmosphereProfile {
-  effects: AtmosphereEffect[];
-  lightingTint: string;              // 'cold'|'warm'|'night'|'rgba(0,0,0,0)'
-  ambientIntensity: number;
-}
-```
-
-#### CharacterRelationship
-
-```typescript
-type RelationshipType = 'stranger' | 'approaching' | 'confronting' | 'avoiding' | 'conversing';
-
-interface CharacterRelationship {
-  actorAId: string;
-  actorBId: string;
-  type: RelationshipType;
-  awarenessRadius: number;
-  gazeTarget: string | null;
-  emotionalReaction: ActorEmotion | null;
-  preferredDistance?: number;
-  tension?: number;
-}
-```
-
-#### SemanticMutationOperation (Phase 2.5)
-
-A discriminated union of all possible semantic mutations:
-
-| Type | Purpose |
-|------|---------|
-| `SetTone` | Change scene tone (sad, tense, lonely, etc.) |
-| `AdjustLighting` | Modify lighting tint and ambient intensity |
-| `AddAtmosphere` | Add effects (rain, fog, flicker, etc.) |
-| `QueueActorAction` | Queue a semantic action for an actor |
-| `SetActorEmotion` | Change an actor's emotion and intensity |
-| `RestageScene` | Trigger scene restaging |
-| `MoveActorToAnchor` | Move an actor to a semantic anchor point |
-| `AdjustRelationship` | Modify relationship between two actors |
-| `FocusCameraOn` | Direct camera to specific subjects |
-
-### Phase 2.6 Types (Cinematic Intelligence)
-
-| Type | Purpose |
-|------|---------|
-| `EmotionalSpatialState` | Spatial intent (intimacy/isolation/confrontation/vulnerability/avoidance/dominance) |
-| `DramaticBeat` | Timing beats (anticipation/silence/reaction/tension_hold/release/interruption) |
-| `ShotIntent` | Shot reasoning (establish/reveal/emphasize/isolate/confront/observe/compress) |
-| `AttentionFocus` | Where viewers should look |
-| `CompositionMetrics` | Rule-of-thirds, negative space, visual weight, silhouette clarity |
-| `PowerDynamic` | Power relationships (dominance/submission/pursuit/withdrawal) |
-| `TensionState` | Accumulated tension level with escalation rate |
-| `AnticipationState` | Build-peak-release cycle |
-
-### Phase 2.7 Types (Beat Runtime)
-
-| Type | Purpose |
-|------|---------|
-| `BeatSequence` | Ordered emotional beats (freeze, collapse, silence, etc.) |
-| `EmotionalArc` | 5-phase arc (setup, rising, peak, falling, resolution) |
-| `PoseProfile` | Joint-level pose language |
-| `ReactionChain` | Triggered emotional reactions between actors |
-| `StoryAnchor` | Symbolic environment shapes (bench, window, streetlight) |
-| `SceneEvolution` | Trajectory tracking for spacing, posture, pacing, camera |
-| `CinematicMomentScore` | Quality score (emotionalClarity, poseReadability, dramaticProgression) |
 
 ---
 
 ## 7. Server (`server/`)
 
-### Entry Point (`server/src/index.ts`)
+The server handles all AI communication, scene generation, and mutation.
+
+### Entry Point (`index.ts`)
 
 ```typescript
+// Express + WebSocket server
 const app = express();
-const port = Number(process.env.PORT ?? 3001);
+const wss = new WebSocketServer({ server });
 
-app.use(cors());
-app.use(express.json());
+// Routes
+app.use('/interpret', interpretRouter);   // POST — create new scene
+app.use('/mutate', mutateRouter);          // POST — mutate existing scene
+app.use('/live-mutate', liveMutateRouter); // WebSocket — real-time edits
+app.use('/ai', aiRouter);                  // GET — provider status
 
-app.get('/health', (_, res) => res.json({ status: 'ok' }));
-app.use('/interpret', interpretRouter);
-app.use('/mutate', mutateRouter);
+// Health check
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 ```
 
-### POST `/interpret` — Scene Generation
+### Routes
 
-**File**: `server/src/routes/interpret.ts` (348 lines)
+#### `POST /interpret`
 
-Generates a complete `SceneGraph` from a natural language prompt.
+Creates a **new scene** from a natural language prompt.
 
-**Flow**:
-1. Receive `{ prompt: string }` in request body
-2. If `OPENAI_API_KEY` is set → call OpenAI API with structured JSON schema response
-3. If no API key → use `createFallbackScene()` regex-based generation
-4. Normalize the response with `normalizeSceneGraph()` (fills missing fields from fallback)
-5. Return complete `SceneGraph` JSON
+**Request:**
+```json
+{
+  "prompt": "A lonely man waits outside a hospital in the rain at night",
+  "directing": {
+    "directorIntent": { "emotionalIntensity": 0.7, "symbolicAbstraction": 0.3 },
+    "actorOverrides": []
+  }
+}
+```
 
-**Fallback Scene Generation** detects:
-- **Emotions**: sad, nervous, happy, excited, angry, exhausted, awkward
-- **Actions**: walk, sit, approach, confront, comfort, talk to, avoid
-- **Environments**: 11 types (indoor_room, outdoor_park, rooftop, hospital, subway, hallway, apartment, staircase, outdoor_street, outdoor_beach, outdoor_forest)
-- **Atmosphere**: rain, flicker, night
-- **Tone**: lonely, sad, tense
-- **Relationships**: confronting, approaching, conversing, avoiding (spawns 2nd actor)
+**Response:** Complete `SceneGraph` with all fields populated by LLM + fallback.
 
-**Timeouts**: 30s server-side, 35s client-side
+**Flow:**
+1. `orchestrator.orchestrateSceneGeneration(prompt)` — compiles intent, runs agents
+2. Resolves best available AI provider (Groq → OpenAI → Anthropic → Gemini → Ollama → Mock)
+3. Calls LLM with `sceneGenerationSystemPrompt` + user prompt + director context
+4. LLM returns JSON matching `sceneGenerationResponseSchema`
+5. Normalizes/validates response, applies director intent adjustments
+6. Falls back to regex-based scene planner if all providers fail
 
-### POST `/mutate` — Scene Mutation
+#### `POST /mutate`
 
-**File**: `server/src/routes/mutate.ts` (643 lines)
+Mutates an **existing scene** with a conversational edit.
 
-Mutates an existing scene based on a natural language prompt. Returns a **sparse patch** — only changed fields.
+**Request:**
+```json
+{
+  "prompt": "make it more tense, add fog",
+  "currentScene": { /* partial scene state */ },
+  "directing": { /* optional context */ }
+}
+```
 
-**Flow**:
-1. Receive `{ prompt: string, currentScene: {...} }` in request body
-2. If `OPENAI_API_KEY` is set → call OpenAI API
-3. If no API key → use `createFallbackPatch()` regex-based mutation
-4. Normalize with `normalizePatch()` — strip fields identical to current scene
-5. Return `Partial<SceneGraph>` patch
+**Response:** Partial `SceneGraph` patch (only changed fields).
 
-**Fallback Mutation** supports:
-- Lighting: darker, brighter, warmer, cold/warm light, night mode
-- Emotions: all 8 emotion states
-- Tones: lonely, tense, romantic, energetic, threatening
-- Atmosphere: rain, fog, flicker
-- Environments: park, street, beach, forest, rooftop, hallway, subway, hospital, apartment, staircase
-- Actions: walk, stop, sit, approach, pace, hesitate
-- Actor management: add character, remove character
+**Flow:**
+1. `orchestrator.orchestrateMutation(prompt, currentScene)` — compiles intent, checks continuity
+2. Resolves provider, calls LLM with `sceneMutationSystemPrompt`
+3. LLM returns JSON patch matching `sceneMutationResponseSchema`
+4. Falls back to regex-based mutation rules if providers fail
 
-**Key Design**: The `normalizePatch()` function strips unchanged fields from the response so the client only receives what actually changed. This is critical for preserving state across mutations.
+### AI Provider System
 
-### Prompts (`server/src/prompts/`)
+The server implements a **provider registry** with automatic fallback:
 
-- `sceneGenerationPrompt.ts` — System prompt, user prompt builder, and JSON schema for scene generation
-- `sceneMutationPrompt.ts` — System prompt, user prompt builder, and JSON schema for scene mutation
+| Provider | Model | Latency | Context | Status |
+|----------|-------|---------|---------|--------|
+| **Groq** | qwen/qwen3-32b | ~200ms | 32K | ⭐ Primary |
+| OpenAI | gpt-4o-mini | ~500ms | 128K | Fallback |
+| Anthropic | claude-3-haiku | ~400ms | 200K | Fallback |
+| Gemini | gemini-1.5-flash | ~300ms | 1M | Fallback |
+| Ollama | llama3 (local) | varies | 8K | Local fallback |
+| Mock | regex fallback | <10ms | ∞ | Ultimate fallback |
 
-Both use OpenAI's structured output (`json_schema` response format) with `strict: true` for guaranteed schema compliance.
+**Provider Selection Logic:**
+- **Complex tasks** (high intensity, long prompts): Groq → OpenAI → Anthropic → Gemini → Mock
+- **Moderate tasks**: Groq → Gemini → OpenAI → Ollama → Mock
+- **Simple tasks** (low intensity, short prompts): Groq → Ollama → Gemini → Mock
+
+### AI Orchestrator (`orchestrator.ts`)
+
+The orchestrator is the brain of the server:
+
+```typescript
+class AIOrchestrator {
+  // Phase 1: Intent Compilation
+  intent = compileIntent(prompt);  // → CinematicIntent
+  
+  // Phase 2: Agent Execution (parallel, deterministic)
+  cinematography = planCinematography(intent, actorCount);
+  environment = planEnvironment(intent, prompt);
+  emotionalArc = planEmotionalArc(intent, actorCount);
+  blocking = planBlocking(intent, actorCount);
+  dialogue = planDialogue(intent, actorCount);
+  lighting = planLighting(intent);
+  
+  // Phase 3: Provider Selection & LLM Call
+  provider = providerRegistry.getProviderForComplexity(complexity);
+  scenePlan = await provider.complete(prompt);
+  
+  // Phase 4: Memory Recording
+  sceneMemory.recordScene({...});
+}
+```
+
+### Agents (Deterministic)
+
+Six agents run without LLM calls to provide domain-specific planning:
+
+1. **CinematographerAgent** — framing, shot composition, camera language
+2. **EnvironmentAgent** — location type, time of day, weather, visual density
+3. **EmotionalArcAgent** — emotional trajectory, peak moments, recovery
+4. **BlockingAgent** — actor positioning, spatial relationships
+5. **DialogueAgent** — speech patterns, naturalism level
+6. **LightingAgent** — lighting language, tint, practicals
+
+### Prompts
+
+#### Scene Generation Prompt
+
+The system prompt instructs the LLM to output a complete `SceneGraph`:
+
+- Validates against JSON schema
+- Infers environment from prompt keywords
+- Sets emotions: neutral, sad, happy, nervous, excited, awkward, angry, exhausted
+- Sets actions: idle, walking, sitting, approaching, pacing
+- Supports **action queues** — "walks and sits" → currentAction: "walking", actionQueue: ["sitting"]
+- Respects director intent (0-1 values) as style modifiers
+
+#### Scene Mutation Prompt
+
+The mutation prompt instructs the LLM to output a **patch**:
+
+- Only includes changed fields
+- Preserves all existing actors unless explicitly modified
+- Supports `semanticOperations` array for executable runtime mutations
+- Maps tone changes to camera/lighting/rhythm adjustments
+- Validates against partial schema
 
 ---
 
 ## 8. Client (`client/`)
 
-### Entry Point (`client/src/App.tsx`)
+The client is a React + Three.js application that renders the cinematic scene in real-time.
 
-The root component composes all UI layers:
+### App Structure
 
 ```tsx
-<main className="app-shell">
-  <header className="hero">...</header>
-  <PromptBar />
-  <section className="canvas-frame">
-    <CinematicScene />        {/* Three.js R3F canvas */}
-    <SceneInfoOverlay />      {/* Tone/beat/camera badges */}
-    <PlaybackControls />      {/* Pause/play/speed/reset */}
-    <BeatTimeline />          {/* Beat progress bar */}
-  </section>
-  <div className="directing-panel">
-    <CinematicControls />     {/* 5 semantic sliders */}
-    <CameraPresets />         {/* 8 camera modes */}
-    <ActorDirector />         {/* Click actor + emotion presets */}
-  </div>
-  <SceneGraphView />          {/* Visual scene graph */}
-  <SessionSidebar />          {/* Prompt history */}
-  <DebugPanel />              {/* Ctrl+D raw JSON */}
-</main>
+// App.tsx
+export default function App() {
+  return (
+    <main className="app-shell">
+      <PromptBar />                                    // Main input
+      
+      <CinematicScene />                               // Three.js canvas
+      <PlaybackControls />                             // Play/pause/speed
+      
+      <div className="directing-panel">
+        <CinematicControls />                          // Pacing, tension, atmosphere sliders
+        <CameraPresets />                              // Shot buttons
+        <ActorDirector />                              // Per-actor emotion
+        <ShotSelector />                               // Camera mode buttons
+        <EmotionalSpaceControls />                    // Intimacy/distance sliders
+        <DirectorialStyleSelector />                  // Visual style presets
+        <CinematicDirector />                         // 9 semantic sliders
+        <DemoSelector />                              // Demo scenarios + mutations
+        <SceneSeriesPanel />                          // Multi-scene series
+      </div>
+    </main>
+  );
+}
 ```
 
-### Services (`client/src/services/`)
+### Services
 
-#### `interpretService.ts` (76 lines)
+#### `interpretService.ts`
 
 ```typescript
-export async function interpretScene(prompt: string): Promise<SceneGraph>
+async function interpretScene(
+  prompt: string, 
+  directing?: DirectingContext
+): Promise<SceneGraph> {
+  const response = await fetch(`${apiBaseUrl}/interpret`, {
+    method: 'POST',
+    body: JSON.stringify({ prompt, directing })
+  });
+  return response.json();
+}
 ```
 
-- Calls `POST /interpret` with 35s timeout
-- Validates response is a valid SceneGraph
-- Throws typed errors for timeout, network, and validation failures
-
-#### `mutateService.ts` (64 lines)
+#### `mutateService.ts`
 
 ```typescript
-export async function mutateScene(prompt: string, currentScene: SceneGraph): Promise<Partial<SceneGraph>>
+async function mutateScene(
+  prompt: string,
+  currentScene: SceneGraph,
+  directing?: DirectingContext
+): Promise<Partial<SceneGraph>> {
+  const response = await fetch(`${apiBaseUrl}/mutate`, {
+    method: 'POST',
+    body: JSON.stringify({ prompt, currentScene, directing })
+  });
+  return response.json();
+}
 ```
 
-- Calls `POST /mutate` with the prompt and current scene state
-- Sends `actors`, `environment`, `camera`, `cinematicGrammar`, `atmosphere`, `relationships`, `rhythm`
-- Returns a sparse patch (only changed fields)
+#### `aiService.ts`
+
+Exposes client-side routes for fetching AI Status, debugging compiling intents, fetching and clearing scene memory, running prompt tests, and loading demo experiences.
+
+```typescript
+export async function fetchAIStatus(): Promise<AIStatus>;
+export async function debugIntent(prompt: string): Promise<IntentDebug>;
+export async function debugReasoning(prompt: string): Promise<ReasoningDebug>;
+export async function fetchMemory(): Promise<MemoryState>;
+export async function clearMemory(): Promise<void>;
+export async function runPromptTests(): Promise<PromptTestResults>;
+export async function fetchDemos(): Promise<DemoExperience[]>;
+```
+
+#### `useSceneWebSocket.ts`
+
+A custom React hook that establishes a real-time WebSocket connection to `ws://localhost:3001` (or the configured backend). It listens for `'sceneUpdate'` messages broadcast by the server, parsed into a `SceneGraph` structure, and merges the data directly into the client's `sceneStore` via `sceneStore.mutateScene()`. It also supports auto-reconnection with a 3-second delay.
 
 ---
 
 ## 9. Runtime Systems
 
-The runtime is the heart of Animaster. It runs **every frame** (60 FPS fixed timestep) and computes all visual state from the scene graph.
+The Animaster runtime operates on a **deterministic frame-evaluation architecture** that decouples scene planning (LLM compilation) from scene execution.
 
-### Tick Loop (`runtime/tickLoop.ts`)
+### The Tick Loop (`tickLoop.ts`)
 
-```typescript
-export const FIXED_DELTA_MS = 1000 / 60;  // ~16.67ms
+The execution heart of the application is a fixed 60 FPS tick loop implemented in [tickLoop.ts](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/tickLoop.ts).
+- Drives execution at a steady `16.67ms` timestep (`TICK_DELTA_MS`).
+- Utilizes `requestAnimationFrame` for scheduling.
+- Calculates elapsed delta time, applies client-controlled `playbackSpeed`, and passes the scaled delta to the evaluation cycle.
+- Allows pausing (`sceneStore.isPaused()`) which halts time increments without freezing renderer loops (e.g., camera sway and blinking continue).
 
-export function startTickLoop(onTick: (deltaMs: number) => void): () => void
-```
+### Scene Evaluation Orchestrator (`sceneEvaluator.ts`)
 
-- Fixed timestep game loop using `requestAnimationFrame`
-- Accumulator pattern prevents spiral-of-death when frames are slow
-- Caps frame delta at 100ms to prevent huge jumps
-- Returns a stop function for cleanup
+Every frame, the tick loop executes [sceneEvaluator.ts](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/sceneEvaluator.ts#L62) which sequences all cinematic and acting modules:
 
-### Scene Evaluator (`runtime/sceneEvaluator.ts`)
-
-The main orchestrator that runs all scene-level systems every tick:
-
-```typescript
-export function evaluateScene(scene: SceneGraph): void
-```
-
-**Evaluation order** (all Phase 2.5-3 systems):
-1. Staging rules
-2. Proximity awareness
-3. Reaction chains (Phase 2.7)
-4. Spatial intent resolution (Phase 2.6)
-5. Dramatic timing (Phase 2.6)
-6. Power dynamics (Phase 2.6)
-7. Tension accumulation (Phase 2.6)
-8. Anticipation cycle (Phase 2.6)
-9. Composition metrics (Phase 2.6)
-10. Camera evaluation (Phase 2.6)
-11. Beat sequence progression (Phase 2.7)
-12. Emotional arc progression (Phase 2.7)
-13. Story anchor placement (Phase 2.7)
-14. Scene evolution tracking (Phase 2.7)
-15. Environment reaction (Phase 3)
-
-### Actor Evaluator (`runtime/actorEvaluator.ts`)
-
-Per-actor evaluation pipeline:
-
-```typescript
-export function evaluateActor(actor: Actor, deltaMs: number, scene: SceneGraph): Actor
-```
-
-**Evaluation order**:
-1. Action runtime (walking, sitting, pacing, approaching)
-2. Emotion modifiers
-3. Acting scheduler (weight shift, look around, hesitation, fidget)
-4. Deep acting (posture openness, gaze aversion, breathing rate)
-5. Pose language (emotion-to-pose mapping with smooth transitions)
-6. Beat pose overrides (from active beat sequence)
-
-### Action Runtime (`runtime/actionRuntime.ts`)
-
-Executes actor actions (walking, sitting, pacing, approaching):
-
-```typescript
-export function evaluateActionRuntime(actor: Actor, deltaMs: number, scene: SceneGraph): Actor
-```
-
-- Manages action queue and action plan promotion
-- `executeWalkTo()` — moves actor toward target position at speed
-- `executeSittingDown()` — transitions to seated pose
-- `executePacing()` — oscillates between waypoints
-- Idle evaluator checks `actionQueue` and transitions to next action
-
-### Runtime Module Directory
-
-| Directory | Purpose | Phase |
-|-----------|---------|-------|
-| `acting/` | Acting primitives (weight shift, look around, hesitation) | 2 |
-| `anchors/` | Semantic anchor management | 2.5 |
-| `anticipation/` | Build-peak-release cycle | 2.6 |
-| `arcs/` | Emotional arc progression and atmosphere effects | 2.7 |
-| `attention/` | Attention focus resolution and camera bias | 2.6 |
-| `beats/` | Beat sequence evaluation and tone templates | 2.7 |
-| `behaviors/` | Behavioral patterns | 2 |
-| `camera/` | Intent-driven camera and shot resolution | 2.6 |
-| `composition/` | Rule-of-thirds, visual weight, depth separation | 2.6 |
-| `continuity/` | Continuity validation and repair | 2.5 |
-| `dynamics/` | Power dynamic resolution | 2.6 |
-| `emotions/` | Emotion modifiers and aftermath | 2 |
-| `environment/` | Environment reaction system | 3 |
-| `evolution/` | Scene evolution tracking and moment scoring | 2.7 |
-| `poses/` | Pose language profiles and transitions | 2.7 |
-| `reactions/` | Reaction chain triggers and execution | 2.7 |
-| `rhythm/` | Tempo and motion energy evaluation | 2 |
-| `spatial/` | Spatial intent resolution (intimacy/isolation/confrontation) | 2.6 |
-| `staging/` | Actor staging rules | 2 |
-| `tension/` | Tension accumulation and compression | 2.6 |
-| `timing/` | Dramatic beat scheduling | 2.6 |
-| `validation/` | Readability validation | 2.6 |
-
-### Key Standalone Modules
-
-| Module | Purpose |
-|--------|---------|
-| `cinematicGrammarRegistry.ts` | Maps tones to cinematic templates (camera, spacing, energy, pause, contrast) |
-| `semanticProfiles.ts` | Derives tone/rhythm runtime profiles from scene state |
-| `semanticOperations.ts` | Applies semantic mutation operations (SetTone, QueueAction, etc.) |
-| `semanticAnchors.ts` | Creates/finds semantic anchors in environments |
-| `deterministicRandom.ts` | Seeded PRNG for deterministic randomness |
-| `initActorJoints.ts` | Initializes stickman joint positions from a base position |
-| `proximityAwareness.ts` | Detects actor proximity and triggers relationship changes |
+1. **State Invalidation & Inits**: Verifies presence of mandatory state properties via [ensureSemanticRuntimeState](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/semanticOperations.ts#L9). Resets temporary joint-rotation metrics if actor IDs change.
+2. **Actor Staging**: Invokes [evaluateStaging](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/staging/stagingEvaluator.ts) to calculate baseline coordinate adjustments according to the scene's emotional tone and spacing factors.
+3. **Proximity & Relationships**: Invokes [evaluateProximity](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/proximityAwareness.ts) to dynamically update character distance states, gaze targets, and closeness thresholds.
+4. **Reaction Timing**: Invokes [evaluateReactions](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/acting/reactionTiming.ts) to handle physical recoil or adjustments triggered by close proximity.
+5. **Emotional Aftermath**: Invokes [applyEmotionalAftermath](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/continuity/emotionalAftermath.ts) to simulate exponential recovery and residue of high-intensity emotions (slouched joints, nervous fidgeting).
+6. **Emotional Spatial Intelligence**: Runs [resolveSpatialIntent](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/spatial/spatialIntentResolver.ts) and applies framing biases ([applyNegativeSpace](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/spatial/negativeSpaceController.ts), [applyFrameEdgeBias](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/spatial/frameEdgeBias.ts)) to push actors into expressive positions (e.g. edge-of-frame for isolation).
+7. **Dramatic Timing Engine**: Evaluates dramatic beats ([scheduleBeats](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/timing/beatScheduler.ts), [evaluateBeats](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/timing/beatEvaluator.ts)) to schedule temporary pauses, reactions, and silence periods.
+8. **Power Dynamics**: Resolves dominance/submission indices with [resolvePowerDynamics](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/dynamics/powerDynamicResolver.ts) and applies posture and vertical staging scaling ([applyPowerAwareStaging](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/dynamics/powerAwareStaging.ts)).
+9. **Tension & Anticipation**: Calculates visual tension build-ups ([accumulateTension](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/tension/tensionAccumulator.ts)) and builds anticipation states ([buildAnticipation](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/anticipation/anticipationBuilder.ts)) which restrict motion damping before triggering cinematic release ([applyPayoffRelease](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/anticipation/payoffRelease.ts)).
+10. **Composition Metrics**: Computes rule-of-thirds, visual balancing, and silhouette weight scores with [calculateCompositionMetrics](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/composition/visualWeightBalancer.ts).
+11. **Camera Framing & Attention**: Maps gaze directions ([resolveAttentionFocus](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/attention/attentionResolver.ts)) and camera intent ([resolveShotIntent](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/camera/shotIntentResolver.ts)) to apply camera positioning and offsets ([evaluateCameraRuntime](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/camera/cameraRuntime.ts)).
+12. **Beat Sequences & Emotional Arcs**: Updates and processes ongoing multi-phase narratives ([advanceBeatSequence](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/beats/beatSequenceRunner.ts), [advanceEmotionalArc](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/arcs/arcEvaluator.ts)) which drive acting modifiers, camera zooms, and atmospheric lighting shifts.
+13. **Reaction Chains**: Advances automated event-driven reactions ([advanceReactionChain](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/reactions/reactionRunner.ts)).
+14. **Scene Evolution & Continuity**: Updates trajectories for camera zoom, spacing, and pacing over the scene's lifetime ([evaluateSceneEvolution](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/evolution/sceneEvolutionEvaluator.ts)). Validates layout against previous frames using [validateContinuity](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/continuity/continuityTracker.ts#L188) and captures snapshots to persist history.
 
 ---
 
 ## 10. Three.js Rendering Layer
 
-**Directory**: `client/src/three/components/`
+The visual representation of Animaster uses a specialized 3D canvas built in Three.js and React Three Fiber (R3F), located in [client/src/three/components/](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components).
 
-The rendering layer converts the semantic scene graph into 3D visuals using React Three Fiber.
+### Core Components
 
-### CinematicScene (`CinematicScene.tsx` — 120 lines)
+#### 1. `CinematicScene.tsx`
+The primary canvas entry point ([CinematicScene.tsx](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components/CinematicScene.tsx)).
+- Instantiates the R3F `<Canvas>` wrapper with shadow mapping support and `ACESFilmicToneMapping` exposure.
+- Subscribes to `sceneStore` mutations to trigger frame state updates.
+- Wires the fixed-timestep loop that updates individual actors (`evaluateActor`) and evaluations (`evaluateScene`) on every tick.
+- Spawns lighting, environment meshes, props, camera controls, particle systems, and post-processing elements.
 
-The root R3F component that:
-1. Creates a `<Canvas>` with ACES filmic tone mapping and shadow maps
-2. Subscribes to `sceneStore.onSceneChange()` for reactive updates
-3. Runs the tick loop (evaluateActor + evaluateScene) at 60 FPS
-4. Composes all 3D sub-components:
+#### 2. `CharacterMesh.tsx`
+Renders actors as procedural stickman skeletons ([CharacterMesh.tsx](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components/CharacterMesh.tsx)).
+- **Aesthetic**: Prioritizes silhouette readability inspired by Limbo and Kentucky Route Zero.
+- **Emotion Colors**: Modulates color base using `EMOTION_COLORS` mapping (e.g. `neutral` is grey, `sad` is blue, `happy` is yellow, `nervous` is orange, `angry` is red, `exhausted` is purple).
+- **Postures**: Modulates lean angle, shoulder droop, head tilt, and arm angles using `EMOTION_POSTURE` mapping.
+- **Facial System**: Renders a head mesh with interactive sub-components:
+  - `Eye`: Controls scaleY to simulate random blinking patterns, and offsets pupil position coordinates (`gazeRef`) to represent jittery gazes (nervous) or downcast looks (sad/exhausted).
+  - `Brow`: Alters angles to signal sadness, anger, or nervousness.
+  - `Mouth`: Generates a vector curve representing smiles (happy), frowns (sad), tight lines (angry), or squiggly lines (nervous).
+- **Animations**: Handles breathing cycles (pulses scale at a rate modulated by anxiety level) and leg/arm walking swings computed dynamically from action states.
 
-```tsx
-<Canvas shadows>
-  <fog />
-  <SceneLighting tone={tone} tensionLevel={tensionLevel} />
-  <EnvironmentMesh envType={envType} tone={tone} />
-  <SceneProps envType={envType} tone={tone} />
-  <AtmosphereEffects effects={...} lightingTint={...} />
-  {actors.map(actor => <CharacterMesh actor={actor} />)}
-  <SceneCameraController camera={camera} tone={tone} />
-  <ScenePostProcessing tone={tone} tensionLevel={tensionLevel} />
-</Canvas>
-```
+#### 3. `EnvironmentMesh.tsx`
+Builds procedural 3D environments ([EnvironmentMesh.tsx](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components/EnvironmentMesh.tsx)).
+- Supports 18+ location types (e.g. subway, alley, forest, apartment, rooftop, hospital, parking garage, diner, office, warehouse, staircase).
+- Renders structural details: Wall panels, checkboard flooring, pillars (parking garage), stair steps (staircase), diner booths, office desks, and warehouse racks.
+- Integrates a **parallax backdrop system** that creates depth layering by spawning silhouette elements (e.g. skylines, city building blocks, or tree outlines) that translate relative to camera movement.
+- Controls ground and ceiling colors, skyline layouts, and fog density.
 
-### CharacterMesh (`CharacterMesh.tsx` — 300 lines)
+#### 4. `AtmosphereEffects.tsx`
+Renders real-time weather and atmospheric particle systems ([AtmosphereEffects.tsx](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components/AtmosphereEffects.tsx)).
+- **Particle Fields**: Implements GPU-friendly particle fields for:
+  - `rain`: High-speed downward blue-tinted points.
+  - `snow`: Floating larger white points.
+  - `dust`: Slow-drifting warm particles simulating indoor light shafts.
+  - `embers`: Upward floating orange points simulating fires or ashes.
+- Includes wrap-around logic that loops particles back to boundary origins once they exceed spatial constraints.
+- Spawns horizontal fog bands and a pulsing flicker light source simulating failing fluorescent or streetlights.
 
-Stylized 3D stickman with:
-- **Body**: Capsule torso, sphere head, capsule arms and legs
-- **Face**: Eyes (spheres with pupils), eyebrows (boxes), mouth (curved line)
-- **8 emotion colors**: neutral=0xb0a898, sad=0x6688bb, happy=0xddcc77, nervous=0xddaa55, angry=0xcc5544, etc.
-- **Emotion-driven posture**: Head tilt, shoulder drop, lean, arm angle per emotion
-- **Blink system**: Random blinks every 2.5-6s
-- **Gaze system**: Emotion-driven (nervous=jittery, sad=downward)
-- **Walking animation**: Arm and leg swing via refs
-- **Breathing**: Subtle scale oscillation
+#### 5. `SceneLighting.tsx`
+Cinematic light rigs controlled by tone ([SceneLighting.tsx](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components/SceneLighting.tsx)).
+- Combines a main directional Key light, an ambient Fill light, a point Rim light, and an base Ambient light.
+- Key light position shifts with a subtle sinusoidal sway to simulate emergent shadows.
+- Integrates a **tension-pulse light** that projects an ambient red flash matching tension escalation levels.
 
-### EnvironmentMesh (`EnvironmentMesh.tsx` — 277 lines)
-
-Procedural 3D environments for 11 types:
-
-| Type | Features |
-|------|----------|
-| `indoor_room` | Ground plane, walls, ceiling |
-| `apartment` | Warm-toned room |
-| `hallway` | Narrow walls, deep fog |
-| `hospital` | Tile pattern floor |
-| `subway` | Tracks, rails, pillars |
-| `outdoor_street` | Skyline buildings, no ceiling |
-| `outdoor_park` | Trees, green ground |
-| `outdoor_beach` | Sand ground, water plane |
-| `outdoor_forest` | Dense trees |
-| `rooftop` | Ledge, skyline, vent |
-| `staircase` | Walls, no skyline |
-
-Each environment has unique colors for ground, walls, ceiling, sky, and fog.
-
-Sub-components:
-- `SkylineBuildings` — Procedurally generated building silhouettes (seeded RNG)
-- `Trees` — Procedural trunk + canopy spheres
-- `WallPanels` — Back, left, right walls for indoor scenes
-
-### SceneLighting (`SceneLighting.tsx` — 151 lines)
-
-Cinematic three-point lighting driven by scene tone:
-
-- **Key light** (DirectionalLight) — 1024x1024 shadow map, subtle positional sway
-- **Fill light** (HemisphereLight) — Fills shadows
-- **Rim/back light** (PointLight) — Edge lighting for silhouette readability
-- **Ambient base** (AmbientLight) — Base illumination
-- **Tension pulse** (PointLight) — Red pulsing when tension > 0.2
-
-Each tone has a unique lighting configuration:
-
-| Tone | Key Color | Key Intensity | Ambient |
-|------|-----------|---------------|---------|
-| neutral | warm white | 0.8 | 0.35 |
-| lonely | blue | 0.5 | 0.2 |
-| tense | orange-red | 0.7 | 0.15 |
-| romantic | warm orange | 0.7 | 0.25 |
-| threatening | dark red | 0.6 | 0.1 |
-
-### AtmosphereEffects (`AtmosphereEffects.tsx` — 218 lines)
-
-GPU particle systems and effects:
-
-| Effect | Particles | Color | Speed | Notes |
-|--------|-----------|-------|-------|-------|
-| Rain | 800 | blue-gray | 8 | Falling down + slight wind |
-| Snow | 400 | white | 0.8 | Slow drift down |
-| Dust | 150 | amber | 0.15 | Horizontal drift |
-| Embers | 60 | orange-red | 0.6 | Rising upward |
-| Fog | — | — | — | 4 horizontal translucent planes |
-| Flicker | — | — | — | Pulsing orange point light |
-
-All particle systems use additive blending and depth-write disabled for proper transparency. Particles wrap around when they leave bounds.
-
-### SceneCamera (`SceneCamera.tsx` — 126 lines)
-
-Tone-driven camera controller:
-
-- **Smooth interpolation**: Position and look-at lerp at 0.04
-- **FOV interpolation**: Gradual FOV changes with 0.05 lerp
-- **Camera mode adjustments**: close_up (0.5x distance), wide_shot (1.4x), dramatic_zoom (0.4x), tension (0.7x + FOV reduction)
-- **Actor tracking**: Camera centers on actor group centroid
-- **Handheld shake**: Sin-based drift for tense/threatening tones (configurable drift amount)
-
-| Tone | FOV | Height | Distance | Drift |
-|------|-----|--------|----------|-------|
-| neutral | 50 | 3.0 | 8.0 | 0 |
-| lonely | 55 | 3.5 | 10.0 | 0.003 |
-| tense | 42 | 2.5 | 6.0 | 0.01 |
-| threatening | 38 | 2.0 | 5.5 | 0.015 |
-
-### ScenePostProcessing (`ScenePostProcessing.tsx` — 87 lines)
-
-Post-processing effects via `@react-three/postprocessing`:
-
-- **Bloom** — Glow on bright areas (intensity/threshold per tone)
-- **Vignette** — Dark edges (offset/darkness per tone, boosted by tension)
-- **Film Grain** (Noise) — Subtle grain overlay
-
-| Tone | Bloom Intensity | Vignette Darkness | Noise |
-|------|----------------|-------------------|-------|
-| neutral | 0.3 | 0.5 | 0.03 |
-| lonely | 0.5 | 0.75 | 0.05 |
-| threatening | 0.35 | 0.9 | 0.07 |
-| romantic | 0.6 | 0.55 | 0.02 |
-
-### SceneProps (`SceneProps.tsx` — 249 lines)
-
-Procedural environmental storytelling props:
-
-| Prop | Component | Features |
-|------|-----------|----------|
-| Street Light | `StreetLight` | Pole + arm + lamp sphere + animated point light |
-| Bench | `Bench` | Seat + backrest + metal legs |
-| Vending Machine | `VendingMachine` | Body + glowing screen + blue point light |
-| Neon Sign | `NeonSign` | Glowing box + flickering point light |
-| Window | `Window` | Frame + translucent glass + cool point light |
-| Hospital Bed | `HospitalBed` | Metal frame + mattress + 4 legs |
-| Subway Pillar | `SubwayPillar` | Tall cylinder |
-| Trash Can | `TrashCan` | Short cylinder |
-
-Props are placed per-environment via `ENV_PROPS` lookup table.
+#### 6. `ScenePostProcessing.tsx`
+Applies filmic post-processing effects ([ScenePostProcessing.tsx](file:///c:/Users/viren/Desktop/Animaster/client/src/three/components/ScenePostProcessing.tsx)).
+- Integrates Bloom, Vignette, and Film Grain (Noise) overlays.
+- Parameters (bloom threshold, vignette size, noise opacity) scale according to the active scene tone and tension levels (e.g. tension darkens vignettes, sad boosts bloom glow).
 
 ---
 
 ## 11. UI Components
 
-### PromptBar (`components/PromptBar.tsx` — 73 lines)
+Animaster utilizes a rich dashboard layout constructed of functional React components found in [client/src/components/](file:///c:/Users/viren/Desktop/Animaster/client/src/components).
 
-The primary user input. Routes prompts to either scene generation or mutation:
+### UI Layout Map
 
-```
-IF currentScene.actors.length > 0 AND currentScene.version > 0:
-  → mutateScene(prompt, currentScene) → sceneStore.applyPatch(patch, prompt)
-ELSE:
-  → interpretScene(prompt) → sceneStore.setScene(scene)
-```
-
-### CinematicControls (`components/CinematicControls.tsx` — 152 lines)
-
-5 semantic sliders for live directing:
-
-| Slider | Range | Effect |
-|--------|-------|--------|
-| Pacing | 0-100 | Controls rhythm tempo (slow/medium/fast) and pause frequency |
-| Tension | 0-100 | Controls spacing multiplier and contrast boost |
-| Atmosphere | 0-100 | Controls ambient light intensity |
-| Camera Energy | 0-100 | Controls motion energy scale |
-| Emotional Distance | 0-100 | Controls headroom and camera zoom |
-
-Each slider immediately applies a patch to the scene store.
-
-### PlaybackControls (`components/PlaybackControls.tsx`)
-
-Overlay at bottom of canvas:
-- Pause / Play toggle
-- Speed selector: 0.25x, 0.5x, 1x, 2x
-- Reset button (restores default scene)
-
-### CameraPresets (`components/CameraPresets.tsx`)
-
-8 camera preset buttons:
-- Intimate (close_up, zoom 1.15)
-- Wide (wide_shot, zoom 0.75)
-- Over Shoulder
-- Dramatic (dramatic_zoom, zoom 1.5)
-- Tension (tension mode)
-- Follow
-- Static
-- Cinematic
-
-### ActorDirector (`components/ActorDirector.tsx`)
-
-Click an actor, then apply an emotion preset:
-- Lists actors as selectable chips
-- Shows 8 emotion presets when an actor is selected
-- Applies emotion mutation via `sceneStore.applyPatch()`
-
-### SessionSidebar (`components/SessionSidebar.tsx` — 43 lines)
-
-Collapsible sidebar showing prompt history:
-- Chronological list of all prompts
-- Timestamps for each entry
-- Hidden when no history exists
-
-### DebugPanel (`components/DebugPanel.tsx` — 47 lines)
-
-Toggle with **Ctrl+D**:
-- Fixed panel on right side
-- Shows live `JSON.stringify(scene, null, 2)` of current SceneGraph
-- Updates every frame via `sceneStore.onSceneChange()`
-
-### SceneInfoOverlay (`components/SceneInfoOverlay.tsx`)
-
-Top-right overlay badges showing:
-- Current tone (e.g., "LONELY")
-- Beat index (e.g., "BEAT 3/5")
-- Arc phase (e.g., "RISING")
-- Moment score (e.g., "SCORE 72")
-- Camera mode (e.g., "WIDE_SHOT")
-- Tension level
-
-### BeatTimeline (`components/BeatTimeline.tsx`)
-
-Horizontal progress bar above playback controls:
-- Segments for each beat in the sequence
-- Current beat highlighted
-- Past beats dimmed
-
-### SceneGraphView (`components/SceneGraphView.tsx`)
-
-Visual representation of the scene graph structure with expandable sections.
+- **`PromptBar.tsx`**: The primary input bar. Includes suggestions and handles submitting prompt triggers to interpret/mutate services.
+- **`CinematicDirector.tsx`**: Side panel exposing **9 Semantic Sliders** mapping directly to the director intent values:
+  - *Emotional Intensity*: Modulates action pacing and motion energy levels.
+  - *Visual Density*: Modulates backdrop lighting intensities and fog.
+  - *Environmental Richness*: Alters contrast curves.
+  - *Symbolic Abstraction*: Biases camera zoom ranges and headroom.
+  - *Dialogue Naturalism*: Controls pause frequencies and tempo.
+  - *Cinematic Realism*: Shifts color tints from natural to expressionistic.
+  - *Camera Aggression*: Increases camera movement speed and closer framing.
+  - *Atmosphere Weight*: Alters fog density and ambient shading.
+  - *Directorial Intensity*: Scale visual energy and motion damping thresholds.
+- **`CinematicControls.tsx`**: Slider adjustments for global scene tempo, tension escalation, weather overlays, and sound properties.
+- **`ActorDirector.tsx`**: Direct overrides that allow manual adjustments of character emotions (e.g. sad, happy, angry) and intensity levels.
+- **`SceneSeriesPanel.tsx`**: Supports narrative chaining. Displays current scene sequence indices, allows deleting, moving, adding scenes, and navigating storyboard nodes.
+- **`DemoSelector.tsx`**: Lists pre-loaded capabilities demos (lonely subway, apartment tension, etc.) and provides guides for applying sequential mutations.
+- **`PlaybackControls.tsx`**: Houses standard controls (Play, Pause, Speed multiplier).
+- **`CameraPresets.tsx` & `ShotSelector.tsx`**: Buttons mapping camera modes (follow, over-the-shoulder, close-up, wide-shot, static, tension-zoom) to camera coordinates.
+- **`SessionSidebar.tsx`**: Logs prompt session entries enabling a history timeline.
+- **`SceneGraphView.tsx`**: Debug panel that visualizes the raw JSON schema structure of the current scene graph.
+- **`BeatTimelineV2.tsx`**: Graphs dramatic beat progress, timers, and transitions.
+- **`CinematicInspector.tsx` & `AIDebugPanel.tsx`**: Inspection overlays displaying real-time metrics for visual weights, rule-of-thirds alignment, spatial intent, and LLM reasoning steps.
 
 ---
 
 ## 12. Scene Store & State Management
 
-**File**: `client/src/store/sceneStore.ts` (287 lines)
+The core state manager is [sceneStore.ts](file:///c:/Users/viren/Desktop/Animaster/client/src/store/sceneStore.ts), which handles state serialization and merges patches.
 
-A custom reactive store using the pub/sub pattern (no external state library for the core scene).
+### Core Mechanics
 
-### API
-
-| Method | Purpose |
-|--------|---------|
-| `getScene()` | Returns a deep clone of current scene |
-| `setScene(scene)` | Replaces entire scene (used for new scene generation) |
-| `mutateScene(mutator)` | In-place mutation with clone-mutate-notify pattern (used by tick loop) |
-| `applyPatch(patch, prompt)` | Applies a sparse patch from server mutation (used by PromptBar) |
-| `setPaused(paused)` | Pause/resume runtime |
-| `isPaused()` | Check pause state |
-| `setPlaybackSpeed(speed)` | Set playback speed multiplier |
-| `getPlaybackSpeed()` | Get current speed |
-| `resetScene()` | Reset to default empty scene |
-| `onSceneChange(listener)` | Subscribe to scene changes (returns unsubscribe function) |
-
-### Deep Merge
-
-The store uses a custom `deepMerge()` function for applying patches:
-- Recursively merges objects (non-array, non-null)
-- Arrays are replaced entirely (not merged element-by-element)
-- `undefined` values in the source are skipped
-- This ensures sparse patches correctly overlay on existing state
-
-### applyPatch() Flow
-
-```
-1. Clone current scene
-2. Ensure semantic runtime state (simulation, anchors, continuity, etc.)
-3. Apply semantic operations (if present in patch)
-4. Deep merge: environment, camera, cinematicGrammar, atmosphere, rhythm
-5. Merge actors by ID (existing actors updated, new actors added)
-6. Replace relationships array
-7. If meaningful changes detected:
-   - Clear all Phase 2.6 computed fields
-   - Clear all Phase 2.7 computed fields
-   - Clear Phase 3 computed fields
-   - Reset pose transitions and arc caches
-8. Re-ensure semantic runtime state
-9. Increment version
-10. Add to mutationHistory and sessionHistory
-11. Notify all listeners
-```
+- **Single Source of Truth**: The active visual state resides in `currentScene` (matching `SceneGraph` interface) and `currentSeries` (matching `SceneSeries` interface).
+- **Reactive Pub-Sub**: Listeners register using `onSceneChange` and `onSeriesChange`. The system triggers updates imperatively using `notify()` or `notifySeries()`.
+- **Deep Merging**: The store implements a recursive `deepMerge()` algorithm that merges sparse patches generated by the AI server without deleting unaffected fields.
+- **Joint and State Initialization**: When a new scene is set (`setScene`), the store executes `initActorJoints()` to compute skeleton vectors for new characters, and clears stale poses and cached variables.
+- **State Clearing on Patch**: Applying changes clears transient runtime properties (e.g. `dramaticBeats`, `tensionState`, `emotionalSpatial`, `reactionChains`) to force runtime evaluators to rebuild them according to the updated parameters and tones.
+- **History Tracking**: Automatically pushes records into `sessionHistory` and `mutationHistory` to preserve prompts, versions, and operations.
 
 ---
 
 ## 13. Data Flow & Mutation Pipeline
 
-### New Scene Generation
+The diagram below outlines the runtime lifecycle of a scene mutation request:
 
 ```
-User types prompt
-     │
-     v
-PromptBar detects empty scene (actors.length === 0 || version === 0)
-     │
-     v
-interpretService.ts → POST /interpret { prompt }
-     │
-     v
-Server: interpretPrompt()
-  ├── OpenAI API (if OPENAI_API_KEY set) → structured JSON response
-  └── createFallbackScene() (regex-based) → SceneGraph
-     │
-     v
-normalizeSceneGraph() → fill missing fields
-     │
-     v
-Response: complete SceneGraph JSON
-     │
-     v
-Client: initActorJoints() for each actor
-     │
-     v
-sceneStore.setScene(scene) → notify listeners → CinematicScene re-renders
+ ┌───────────┐       Prompt & State        ┌──────────────┐
+ │ PromptBar │────────────────────────────▶│  Express API │
+ └───────────┘                             │  (Server)    │
+       ▲                                   └──────┬───────┘
+       │                                          │
+       │                                          ▼
+       │                                   ┌──────────────┐
+       │                                   │ AI           │
+       │                                   │ Orchestration│
+       │                                   └──────┬───────┘
+       │                                          │
+       │                                          ▼
+       │                                   ┌──────────────┐
+       │                                   │ LLM Provider │
+       │                                   │ (Groq/etc.)  │
+       │                                   └──────┬───────┘
+       │                                          │ JSON Patch
+       │                                          ▼
+┌──────────────┐      sceneStore.applyPatch   ┌──────────────┐
+│  Three.js/R3F│◀─────────────────────────────│  client      │
+│  Rendering   │                              │  sceneStore  │
+└──────┬───────┘                              └──────────────┘
+       │                                              ▲
+       │ 60 FPS tickLoop                              │
+       └──────────────────────────────────────────────┘
+                    Evaluators (mutate draft)
 ```
 
-### Scene Mutation
+### Process Sequence
 
-```
-User types prompt (scene exists)
-     │
-     v
-PromptBar detects existing scene (actors.length > 0 && version > 0)
-     │
-     v
-mutateService.ts → POST /mutate { prompt, currentScene }
-  (sends actors, environment, camera, cinematicGrammar, atmosphere, relationships, rhythm)
-     │
-     v
-Server: mutateScene()
-  ├── OpenAI API → structured JSON response → normalizePatch()
-  └── createFallbackPatch() (regex-based) → Partial<SceneGraph>
-     │
-     v
-Response: sparse patch (only changed fields)
-     │
-     v
-sceneStore.applyPatch(patch, prompt)
-  ├── Apply semantic operations
-  ├── Deep merge changed fields
-  ├── Clear computed fields
-  ├── Increment version
-  └── Notify listeners
-     │
-     v
-CinematicScene re-renders with updated state
-```
-
-### Runtime Loop (every 16.67ms)
-
-```
-requestAnimationFrame
-     │
-     v
-tickLoop accumulator
-     │
-     v
-if (!paused):
-  scaledDelta = deltaMs * playbackSpeed
-  sceneStore.mutateScene(draft => {
-    draft.actors = draft.actors.map(actor => evaluateActor(actor, scaledDelta, draft))
-    evaluateScene(draft)
-  })
-     │
-     v
-sceneStore notifies listeners → CinematicScene useState updates → R3F re-renders
-```
+1. **Input Submission**: The user submits a prompt (e.g., *"Make it rain and make them look at each other"*).
+2. **Server Handshake**: Client sends the prompt, current `SceneGraph` state, and `DirectingContext` values via `POST /mutate`.
+3. **AI Compilation**: The server's `intentCompiler` resolves keywords, determines complexity, runs parallel agent planners (Blocking, Cinematography, etc.), and invokes the LLM provider (or falls back to regex planning).
+4. **JSON Patch Return**: The server returns a sparse patch representing changed properties (e.g. weather changes to rain, actor actions update to looking at each other).
+5. **Patch Merging**: The client's `sceneStore.applyPatch()` merges the sparse patch into the active scene graph, increments the version count, and records history logs.
+6. **State Notifications**: The store notifies listeners, updating React component layouts and canvas assets.
+7. **Frame Evaluation (60 FPS)**: The tick loop runs evaluators (staging, tension, camera framing, joints) that write emergent positions, joint transforms, and camera transitions back into the active draft on every frame.
+8. **Visual Render**: The Three.js canvas reads the updated values and draws the updated skeleton frames, particles, and shaders.
 
 ---
 
 ## 14. Cinematic Grammar & Tone System
 
-### Tone Templates (`cinematicGrammarRegistry.ts`)
+The platform operates on a semantic mapping system called **Cinematic Grammar** that binds visual styles to the emotional tone of a scene.
 
-Each of the 8 tones maps to a `CinematicTemplate` that drives camera, spacing, timing, and visual treatment:
-
-| Tone | Camera Mode | Spacing | Motion Energy | Pause Freq | Contrast | Headroom |
-|------|------------|---------|---------------|------------|----------|----------|
-| neutral | static | 1.0 | 1.0 | 4 | 0.0 | 1.0 |
-| sad | wide_shot | 1.4 | 0.5 | 10 | 0.1 | 1.2 |
-| tense | close_up | 0.7 | 1.2 | 2 | 0.5 | 0.7 |
-| lonely | wide_shot | 1.8 | 0.6 | 8 | 0.2 | 1.4 |
-| awkward | over_the_shoulder | 1.1 | 0.8 | 6 | 0.0 | 1.0 |
-| energetic | follow | 0.8 | 1.5 | 1 | 0.1 | 0.9 |
-| romantic | close_up | 0.6 | 0.7 | 6 | 0.15 | 1.1 |
-| threatening | tension | 0.5 | 1.3 | 1 | 0.6 | 0.6 |
-
-### Semantic Runtime Profiles (`semanticProfiles.ts`)
-
-Extended tone profiles used by runtime systems:
-
-Each tone also defines:
-- `gestureEnergy` — How much actors gesture
-- `preferredRelationshipDistance` — How far apart actors stand
-- `lightingTint` — warm, cold, or null
-- `negativeSpace` — How much empty space around actors
-- `pauseScale` — How long pauses last
+- **Tone Profile Registry**: [cinematicGrammarRegistry.ts](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/cinematicGrammarRegistry.ts) maps specific `SceneTone` values to visual parameters:
+  - `lonely`: Wide negative spacing, slower actor speed, distant camera, cool desaturated tints.
+  - `tense`: Clamped visual spacing, high motion energy curves, tight camera framing, high contrast, red tension light activation.
+  - `sad`: Drooped posture configurations, slower pacing, misty blue lighting tints, elevated fog.
+  - `romantic`: Close proximity thresholds, warm amber lighting, high bloom ratios.
+  - `threatening`: Oppressive lighting silhouettes, low camera height, high camera drift (handheld shake), dark vignette borders.
+- **Rhythm Mapping**: Translates tone tempo (`slow`, `medium`, `fast`) into tick evaluations:
+  - Dictates pause intervals during actions.
+  - Adjusts joint movement speed using interpolation dampening metrics.
 
 ---
 
 ## 15. Emotion System
 
-### 8 Emotion States
+Animaster uses a detailed skeletal and facial posture system to render character emotions without relying on pre-baked animation cycles.
 
-| Emotion | Body Color | Head Tilt | Shoulder Drop | Lean | Arm Angle |
-|---------|-----------|-----------|---------------|------|-----------|
-| neutral | 0xb0a898 | 0 | 0 | 0 | 0.15 |
-| sad | 0x6688bb | -0.2 | 0.12 | -0.05 | 0.05 |
-| happy | 0xddcc77 | 0.1 | -0.05 | 0.03 | 0.35 |
-| nervous | 0xddaa55 | -0.08 | 0.08 | -0.03 | 0.1 |
-| angry | 0xcc5544 | 0.15 | -0.1 | 0.08 | 0.25 |
-| exhausted | 0x7777aa | -0.25 | 0.18 | -0.08 | 0.02 |
-| awkward | 0xaa9977 | -0.12 | 0.05 | -0.02 | 0.08 |
-| excited | 0xddbb44 | 0.12 | -0.08 | 0.05 | 0.4 |
+### Skeletal Posture Adjustments
 
-### Emotion Effects on Systems
+Every frame, the active character posture is calculated using the actor's emotion state and intensity values:
+- `sad`/`exhausted`: The head tilt is negative (pointing down), shoulders drop, and torso lean is biased backward.
+- `happy`/`excited`: The head tilts upward, shoulders pull back, and arms square out.
+- `angry`: The torso leans forward toward targets, head tilts up, and shoulders square aggressively.
 
-- **Gaze**: Nervous = jittery random, Sad/exhausted = downward
-- **Breathing**: Nervous = fast (4x), Exhausted = slow (1.5x), Normal = 2.5x
-- **Eyes**: Nervous/excited = wider, Angry = constricted pupils
-- **Brows**: Sad = raised inner, Angry = lowered, Nervous = slightly raised
-- **Mouth**: Happy/excited = smile curve, Sad/exhausted = frown, Angry = up-curve, Nervous = wavy, Awkward = asymmetric
+### Expressive Face System
+
+Characters feature an interactive face schema (`FaceExpression`):
+- **Brows**: Rotates eyebrow meshes (e.g. angled inward for angry, sloped outward for sad).
+- **Eyes**: Modulates eye heights (`blinkState`) to simulate random blink ticks. Scales mesh shapes (`round`, `wide`, `narrow`, `squint`) to reflect emotional intensity.
+- **Gaze**: Offsets pupils (`pupilOffsetX`, `pupilOffsetY`). Jitters pupil coordinates for nervous states, or points them downward for sad/exhausted states.
+- **Mouth**: Evaluates a mathematical sine wave representing curved smiles, frowns, tight lips, or squiggles.
+
+### Emotional Decay (`continuity/emotionalAftermath.ts`)
+
+Simulates realistic emotional memory. When a high-intensity emotion ends, [applyEmotionalAftermath](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/continuity/emotionalAftermath.ts) calculates a residual decay curve. For example, a character who was angry will gradually ease back to a neutral posture, retaining minor fidgets or slouched shoulders that slowly decay according to an exponential half-life formula.
 
 ---
 
 ## 16. Camera System
 
-### 7 Camera Modes
+The camera is an active director rather than a static viewport. It translates spatial intent into camera placements.
 
-| Mode | FOV Adjust | Distance Adjust | Height Adjust | Notes |
-|------|-----------|----------------|---------------|-------|
-| static | — | — | — | Fixed position |
-| follow | — | — | — | Tracks actor centroid |
-| close_up | 35 | 0.5x | 0.7x | Tight on subject |
-| wide_shot | 60 | 1.4x | 1.2x | Establishes environment |
-| over_the_shoulder | — | 0.6x | 0.85x | — |
-| dramatic_zoom | 30 | 0.4x | — | Intense focus |
-| tension | FOV-tension*10 | 0.7x | — | FOV narrows with tension |
+### Camera Framing Modes
 
-### Camera Behavior
+- **`static`**: Locks position coordinate targets.
+- **`follow`**: Dynamically tracks the midpoint of all active characters.
+- **`close_up`**: Halves distance, lowers height, and clamps FOV to focus on a target character's silhouette.
+- **`wide_shot`**: Increases camera distance, raises height, and widens FOV to establish environments.
+- **`over_the_shoulder`**: Sets up positioning behind one character looking at another.
+- **`tension`**: Constrains FOV in proportion to the active tension level.
 
-- **Smooth interpolation**: All camera movement lerps at 0.04 speed
-- **Handheld shake**: Composite sine waves at different frequencies for organic drift
-- **FOV animation**: Gradual FOV transitions at 0.05 lerp speed
-- **Actor tracking**: Computes centroid of all actor 3D positions
+### Handheld Drift and Shake
+
+Driven by the scene's emotional tone, the camera controller injects random noise offsets into the camera position matrix:
+- Tense and threatening tones apply a continuous, multi-frequency sinusoidal drift (`drift` value up to `0.015`) to simulate a handheld operator's micro-movements.
+- Increases in frequency and amplitude when tension spikes.
+
+### Transitions
+
+Smooth transitions are achieved through linear interpolation (lerping) of positions, target look-at vectors, and field-of-view (FOV) values at a controlled speed (`0.04` per frame), preventing sudden camera cuts.
 
 ---
 
 ## 17. Atmosphere & Environment System
 
-### 11 Environment Types
+Atmospheric systems translate environmental weather and tones into visual filters and lighting changes.
 
-**Indoor** (walls + ceiling):
-- `indoor_room` — Generic dark room
-- `apartment` — Warm-toned residential
-- `hallway` — Narrow corridor, deep fog
-- `hospital` — Cool tones, tile floor pattern
-- `subway` — Dark, metallic, tracks + rails
-- `staircase` — Enclosed, moody
+### Atmospheric Profiles
 
-**Outdoor** (no ceiling, optional skyline):
-- `outdoor_street` — Building skyline, neon signs, streetlights
-- `outdoor_park` — Trees, green ground, benches
-- `outdoor_beach` — Sand ground, water plane, warm sky
-- `outdoor_forest` — Dense trees, green fog
+Profiles configured on the scene graph dictate particle configurations:
+- **Rain & Snow**: Particles fall within a 3D bounding box surrounding the viewport, wrapping around from top to bottom.
+- **Dust**: Emits slow-drifting brown particles.
+- **Embers**: Emits rising orange-red particles that float upward to simulate ashes.
+- **Lighting Tints**: Replaces standard ambient shading with warm, cool, night, or custom RGBA overlays.
 
-**Special**:
-- `rooftop` — Building ledge, skyline, vent, open sky
+### Environmental Reactivity (`emotionalEnvironmentReactor.ts`)
 
-### Atmosphere Effects
-
-| Effect | Visual | Interaction |
-|--------|--------|-------------|
-| Rain | 800 blue-gray particles falling | Additive blending |
-| Snow | 400 white particles drifting | Slow, wide spread |
-| Dust | 150 amber particles floating | Horizontal drift |
-| Embers | 60 orange particles rising | Upward motion |
-| Fog | 4 translucent horizontal planes | Layered depth |
-| Flicker | Pulsing orange point light | Random intensity drops |
-
-### Lighting Tints
-
-- `cold` — Blue-shifted ambient
-- `warm` — Orange-shifted ambient
-- `night` — Very dark, low ambient intensity (0.4)
-- `rgba(0,0,0,0)` — No tint (default)
+Establishes a feedback loop between character state and the world. High visual tension or extreme character emotions trigger atmospheric changes:
+- Peak anxiety levels cause indoor lights to flicker or pulse.
+- Tense tones worsen storm effects, increasing particle counts and wind drift speed.
+- Sad tones dim ambient lighting and elevate fog layers.
 
 ---
 
-## 18. Phase Progression
+## 18. Scene Series Feature
 
-Animaster has been built in phases, each adding depth to the cinematic runtime:
+The **Scene Series** system chains multiple scene graphs into a sequential storyboard sequence.
 
-### Phase 1 — Vertical Slice (Tasks 1-33)
-- Basic scene generation and rendering
-- Stickman character with walking animation
-- PromptBar with interpret/mutate routing
-- Session history sidebar
-- Debug panel (Ctrl+D)
-- Error recovery (timeouts, fallbacks)
-
-### Phase 2 — Cinematic Grammar (Tasks 34-80)
-- 8 scene tones with cinematic templates
-- 8 emotion states with body animations
-- 7 camera modes with auto-selection
-- Atmosphere effects (rain, fog, flicker, dust)
-- Character relationships (approaching, confronting, avoiding, conversing)
-- Actor staging rules (1-actor and 2-actor layouts)
-- Acting primitives (weight shift, look around, hesitation, pacing)
-- Scene rhythm (tempo, pause frequency, motion energy curves)
-- Continuity tracking
-
-### Phase 2.5 — Semantic Runtime Hardening
-- Deterministic execution with seeded PRNG
-- Semantic mutation operations (discriminated union)
-- Action instances with phases, priorities, and interruption
-- Semantic anchors (door, chair, window, etc.)
-- Continuity validation and repair
-
-### Phase 2.6 — Cinematic Intelligence Deepening (Tasks 81-120)
-- Emotional spatial intelligence (intimacy, isolation, confrontation)
-- Dramatic timing engine (anticipation, silence, tension beats)
-- Shot intent reasoning (establish, reveal, isolate, compress)
-- Attention direction system
-- Deep acting (posture openness, gaze aversion, breathing)
-- Composition heuristics (rule-of-thirds, negative space, visual weight)
-- Power dynamics (dominance, submission, pursuit, withdrawal)
-- Tension accumulation with compression
-- Anticipation build-peak-release cycle
-- Readability validation
-
-### Phase 2.7 — Cinematic Beat Runtime (Tasks 121-160)
-- Beat sequences (ordered emotional beats with camera/spacing/timing responses)
-- 6 tone-specific beat templates
-- Emotional arcs (5-phase: setup → rising → peak → falling → resolution)
-- Embodied pose language (emotion-to-joint-profile mapping)
-- Reaction chains (triggered by approach, confrontation, comfort, etc.)
-- Story anchors (bench, window, streetlight silhouettes)
-- Scene evolution tracking (spacing, posture, pacing trajectories)
-- Cinematic moment scoring
-
-### Phase 3 — Semantic Cinematic Creation (Tasks 161-200)
-- CinematicControls (5 semantic sliders)
-- PlaybackControls (pause, speed, reset)
-- CameraPresets (8 lens modes)
-- ActorDirector (click-to-direct emotions)
-- SceneInfoOverlay, BeatTimeline, SceneGraphView
-- 11 procedural environment types
-- 8 atmospheric effects
-- Server mutations for live directing
-- Prompt suggestions
-
-### Phase 4 — Visual Evolution (Tasks 201-227)
-- Expressive faces (eyes, brows, mouth per emotion)
-- Gaze tracking system
-- Blink system
-- Parallax depth layers
-- Cinematic lighting (key, rim, fill, light shafts)
-- Snow and ember particles
-- Animated props (vending machine, neon sign, bench, etc.)
-- Post-processing (bloom, color grading, vignette)
-
-### Phase 5 — Infrastructure Integration (Tasks 228+)
-- Three.js, React Three Fiber, React Three Drei installation
-- Post-processing pipeline
-- Asset loader with LRU cache
-- Atmosphere controller architecture
-- Camera rig architecture
-- Audio manager architecture
-
-### Phase 5.5 — Full Active Integration
-- CinematicScene R3F Canvas replacing PixiJS
-- EnvironmentMesh — 11 procedural 3D environments
-- CharacterMesh — Stylized 3D stickman with emotion-driven posture and face
-- AtmosphereEffects — GPU particle systems
-- SceneLighting — Tone-driven three-point lighting
-- SceneCamera — Smooth lerp camera with handheld shake
-- ScenePostProcessing — Bloom, vignette, film grain
-- SceneProps — 8 procedural prop types
+- **Storyboard Chaining**: Enables users to generate multi-shot narratives (e.g. *Shot 1: wide establishing shot, Shot 2: close-up, Shot 3: character walks away*).
+- **Navigation Controls**: The client UI provides storyboard tabs for adding, deleting, reordering, and renaming scenes.
+- **State Preservation**: Navigating between storyboard nodes updates the client's current scene and resets runtime caches. This allows each shot to maintain its independent tone, weather profile, and actor setups.
 
 ---
 
-## 19. API Reference
+## 19. Demo System
 
-### `GET /health`
+Animaster includes a suite of pre-loaded **Demo Experiences** configured on the server ([demoExperiences.ts](file:///c:/Users/viren/Desktop/Animaster/server/src/ai/demos/demoExperiences.ts)) to demonstrate capabilities:
 
-Health check endpoint.
+| Demo ID | Title | Core Narrative & Setup | Proves Capabilities |
+|---------|-------|------------------------|---------------------|
+| `lonely-subway` | Lonely Subway at Midnight | Solitary figure on a subway platform. Mutations introduce silent pacing, distant train rumbling, and shift to nostalgic warm lighting. | Semantic planning, lighting intelligence, memory system, tone mutation. |
+| `apartment-tension` | Apartment Emotional Tension | Two people standing in an apartment. Mutations claustrophobically tighten blocking, trigger hesitation beats, and widen spatial distance. | Multi-agent reasoning, spatial relationships, blocking logic. |
+| `rainy-rooftop` | Rainy Rooftop Confrontation | Rainy confrontation. Mutations control anger restraint, build tension without aggression, and handle de-escalation blocking. | Emotional arcs, weather effects, provider fallback logic. |
+| `nostalgic-diner` | Nostalgic Diner Memory | Solitary customer in a diner. Mutations transition between warm memories and cold reality, using emptiness as a character. | Tone switching, visual style profiling, environment grammars. |
+| `hospital-anxiety` | Hospital Waiting Room Anxiety | Patient waiting in a hospital room. Mutations slow pacing to build suspense, and freeze blocking as a new character enters. | Pacing intelligence, dramatic timing, anticipation/payoff loops. |
 
-**Response**: `{ "status": "ok" }`
+---
 
-### `POST /interpret`
+## 20. AI Provider System
 
-Generate a new scene from a natural language prompt.
+The server is equipped with a robust **AI Orchestration Framework** featuring multi-provider fallbacks and context handling.
 
-**Request Body**:
-```json
-{
-  "prompt": "a nervous stickman walking on a dark street at night"
-}
-```
+### Fallback Hierarchy
 
-**Response**: Complete `SceneGraph` JSON (see [Shared Types](#6-shared-types-shared))
+When a client sends a scene generation or mutation request, the server's `providerRegistry` determines availability and selects the best provider using a fallback hierarchy:
 
-**Status Codes**:
-- `200` — Success
-- `400` — Missing prompt
-- `502` — OpenAI error (falls back to regex)
-- `504` — Timeout (30s)
+1. **Groq (Primary)**: Default provider. Uses `qwen/qwen3-32b` for low latency (~200ms) and strong reasoning.
+2. **OpenAI (Secondary)**: Fallback provider. Uses `gpt-4o-mini` (~500ms).
+3. **Anthropic**: Fallback provider. Uses `claude-3-haiku` (~400ms).
+4. **Gemini**: Fallback provider. Uses `gemini-1.5-flash` (~300ms).
+5. **Ollama**: Local offline fallback provider. Uses a locally hosted `llama3` model.
+6. **Mock (Ultimate Fallback)**: RegEx-based fallback system that parses prompt keywords (e.g. "rain", "sad", "walking") and generates valid JSON configurations locally, guaranteeing system uptime even without internet access.
 
-### `POST /mutate`
+### Context Compression
 
-Mutate an existing scene based on a natural language command.
+To prevent token overflows during long prompt sessions, the server monitors context size:
+- Truncates history arrays, preserving only the most recent scene snapshots.
+- Compresses dialogue logs and mutation records, maintaining only active narrative contexts.
 
-**Request Body**:
-```json
-{
-  "prompt": "make it lonelier",
-  "currentScene": {
-    "actors": [...],
-    "environment": {...},
-    "camera": {...},
-    "cinematicGrammar": {...},
-    "atmosphere": {...},
-    "relationships": [...],
-    "rhythm": {...}
+---
+
+## 21. API Reference
+
+The server exposes Express endpoints and WebSocket events.
+
+### HTTP Endpoints
+
+#### `POST /interpret`
+Interprets a prompt to generate a new `SceneGraph`.
+- **Request Body**:
+  ```json
+  {
+    "prompt": "string",
+    "directing": {
+      "directorIntent": { "key": "number" },
+      "actorOverrides": []
+    }
   }
-}
-```
+  ```
+- **Response**: Full `SceneGraph` JSON structure.
 
-**Response**: `Partial<SceneGraph>` — only changed fields
+#### `POST /mutate`
+Applies a conversational edit to modify an existing scene graph.
+- **Request Body**:
+  ```json
+  {
+    "prompt": "string",
+    "currentScene": { "id": "string", "version": "number" },
+    "directing": { "directorIntent": { "key": "number" } }
+  }
+  ```
+- **Response**: A partial `SceneGraph` patch.
 
-**Status Codes**:
-- `200` — Success
-- `400` — Missing prompt or currentScene
-- `502` — OpenAI error (falls back to regex)
+#### `POST /live-mutate`
+Applies rapid semantic edits to active parameters.
+- **Request Body**:
+  ```json
+  {
+    "command": "string",
+    "currentTone": "string",
+    "currentEnvironment": "string",
+    "actorCount": "number",
+    "currentEffects": []
+  }
+  ```
+- **Response**: JSON mapping of live mutation operations.
 
-### Supported Mutation Commands (Fallback Mode)
+#### `GET /ai/status`
+Checks orchestrator health and registers available LLM providers.
+- **Response**:
+  ```json
+  {
+    "orchestrator": { "memoryEntries": 2 },
+    "registeredProviders": ["groq", "openai"],
+    "providerAvailability": { "groq": true, "openai": false }
+  }
+  ```
 
-| Category | Commands |
-|----------|---------|
-| **Lighting** | darker, dim, brighter, bright, lighter, warmer, warm |
-| **Emotions** | nervous, anxious, sad, depressed, happy, cheerful, excited, thrilled, angry, furious, exhausted, tired, awkward, neutral, calm |
-| **Tones** | lonely, tense, romantic, love, intimate, energetic, fast, chaotic, threatening, danger, menacing |
-| **Effects** | rain, add fog, foggy, add flicker, flickering, cold light, warm light, night |
-| **Environments** | park, garden, street, road, alley, beach, ocean, forest, woods, rooftop, hallway, subway, hospital, apartment, staircase |
-| **Actions** | walk, stop, sit, approach, pace, hesitate |
-| **Actors** | add character/person/someone, remove character/person |
+#### `GET /ai/demos`
+Lists all pre-configured demo experiences.
+- **Response**: Array of `DemoExperience` objects.
+
+#### `GET /ai/memory`
+Retrieves historical memories, emotion tracks, and continuity records.
+- **Response**: Objects outlining history tracks and validation lists.
+
+#### `DELETE /ai/memory`
+Clears session memories.
+
+#### `POST /ai/tests`
+Runs the prompt test suite to validate prompt interpretations.
+- **Response**: Test summaries outlining passed/total figures.
+
+### WebSocket Communication
+
+- **Endpoint**: `ws://localhost:3001`
+- **Outgoing Message**: Server broadcasts a `sceneUpdate` payload to connected clients when a route mutates the global scene:
+  ```json
+  {
+    "type": "sceneUpdate",
+    "data": {
+      /* SceneGraph fields */
+    }
+  }
+  ```
 
 ---
 
-## 20. Development Workflow
+## 22. Development Workflow
 
-### Daily Development
+The project is structured as a TypeScript monorepo using npm workspaces.
+
+### Development Commands
+
+Run packages simultaneously in development mode:
 
 ```bash
-# Start server with hot reload
-cd server && npx tsx watch src/index.ts
+# Start backend server with tsx watch
+cd server
+npm run dev
 
-# Start client with HMR
-cd client && npx vite --host 0.0.0.0
+# Start frontend Vite server
+cd client
+npm run dev
 ```
 
-### Type Checking
+### Running Tests
+
+Validate functionality:
 
 ```bash
-# Server
-cd server && npx tsc -p tsconfig.json --noEmit
+# Run server test suite
+cd server
+npm run test
 
-# Client
-cd client && npx tsc -p tsconfig.json --noEmit
+# Run client tests
+cd client
+npm run test
 ```
 
-### Adding New Features
+### Extending the Runtime
 
-1. **Add types** to `shared/src/scene.ts` first
-2. **Add runtime logic** in `client/src/runtime/` — create a subdirectory for new systems
-3. **Wire into evaluators** — add to `sceneEvaluator.ts` (scene-level) or `actorEvaluator.ts` (per-actor)
-4. **Add visual rendering** in `client/src/three/components/` — read from scene state, render with R3F
-5. **Add server support** — update fallback functions in `interpret.ts` and `mutate.ts`
-6. **Add UI controls** — create component in `client/src/components/`
-
-### Key Conventions
-
-- All scene state lives in `SceneGraph` — never store rendering state outside it
-- Runtime evaluators mutate the scene graph in-place (inside `mutateScene()` callback)
-- Three.js components read from scene state passed as props — they never write back
-- Use `useFrame()` for per-frame animations in R3F components
-- Use `useRef()` for imperative updates (eyes, limbs) to avoid React re-renders
-- Sparse patches: mutation responses should only include changed fields
+To implement a new cinematic evaluator (e.g., adding character pacing or reaction states):
+1. Create a new module file under [client/src/runtime/](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime) (e.g. `client/src/runtime/acting/customEvaluator.ts`).
+2. Implement an evaluation function that accepts and returns a `SceneGraph` (or array of `Actor` coordinates).
+3. Import the function in [client/src/runtime/sceneEvaluator.ts](file:///c:/Users/viren/Desktop/Animaster/client/src/runtime/sceneEvaluator.ts).
+4. Register the function inside the `evaluateScene()` sequence.
 
 ---
 
-## 21. Glossary
+## 23. Glossary
 
-| Term | Definition |
-|------|-----------|
-| **SceneGraph** | The root data structure containing all scene state |
-| **Tone** | The emotional mood of a scene (lonely, tense, romantic, etc.) |
-| **Sparse Patch** | A partial SceneGraph containing only changed fields from a mutation |
-| **Semantic Operation** | A typed mutation command (SetTone, QueueActorAction, etc.) |
-| **Beat** | A single emotional moment in a beat sequence |
-| **Beat Sequence** | An ordered list of emotional beats that unfold over time |
-| **Emotional Arc** | A 5-phase narrative curve (setup → rising → peak → falling → resolution) |
-| **Semantic Anchor** | A named position in the environment (door, chair, bench, window) |
-| **Story Anchor** | A symbolic environment shape (bench silhouette, streetlight, window) |
-| **Cinematic Template** | Camera, spacing, and timing defaults for a given tone |
-| **Action Instance** | A semantic action with type, target, phase, priority, and interruptibility |
-| **Action Plan** | A queue of pending ActionInstances for an actor |
-| **Continuity** | Validation that scene state is consistent across mutations |
-| **Power Dynamic** | The dominance/submission relationship between two actors |
-| **Spatial Intent** | The emotional meaning of spacing (intimacy, isolation, confrontation) |
-| **Shot Intent** | The cinematic purpose of a camera shot (establish, reveal, isolate) |
-| **Moment Score** | A quality metric combining emotional clarity, pose readability, dramatic progression, and beat coherence |
-| **Tick Loop** | The fixed 60 FPS game loop that drives all runtime evaluation |
-| **R3F** | React Three Fiber — React renderer for Three.js |
-| **Fallback** | Regex-based scene generation/mutation when no OpenAI API key is available |
+- **Scene Graph**: The single source of truth data model representing characters, environments, cameras, and cinematic settings.
+- **Sparse Mutation**: An update payload containing only changed fields to be merged into an existing scene graph.
+- **Runtime Evaluator**: Code that runs on every frame at 60 FPS to calculate emergent parameters (e.g. joints, framing offsets, and lighting intensity).
+- **Director Sliders**: Sliders in the UI that map qualitative settings (e.g. *Camera Aggression*) directly to numerical configurations.
+- **Tension Accumulator**: A runtime utility tracking silent gaps or spacing limits to build visual tension.
+- **Continuity Violation**: A diagnostic flag raised when the system detects sudden position jumps or emotional flips.
+- **Parallax Backdrop**: Background scenery layers that move at different speeds relative to the camera to create an illusion of depth.
+- **Reaction Chain**: A sequence of scheduled movements or beats triggered when characters reach proximity thresholds.
 
 ---
 
-*This wiki was auto-generated from the ANIMASTER2 codebase. For the latest architecture details, refer to the source code and type definitions in `shared/src/scene.ts`.*
+*Last updated: 2026*
+*Animaster — Direct cinema through language.*

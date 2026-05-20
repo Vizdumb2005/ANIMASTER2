@@ -8,6 +8,8 @@ import { resetArcAtmosphereCache } from '../runtime/arcs/arcAtmosphereEffect';
 
 type SceneListener = (scene: SceneGraph) => void;
 
+type SeriesListener = (series: SceneSeries) => void;
+
 type DirectorIntent = Record<string, number>;
 
 type ActorOverride = {
@@ -140,6 +142,27 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
   return result as T;
 }
 
+// ---- Scene Series ----
+export type SceneSeries = {
+  id: string;
+  title: string;
+  scenes: SceneGraph[];
+  activeIndex: number;
+};
+
+function createDefaultSeries(): SceneSeries {
+  return { id: 'series_001', title: 'Untitled Series', scenes: [], activeIndex: 0 };
+}
+
+let currentSeries: SceneSeries = createDefaultSeries();
+const seriesListeners = new Set<SeriesListener>();
+
+function notifySeries() {
+  const snap = structuredClone(currentSeries);
+  for (const l of seriesListeners) l(snap);
+}
+
+// ---- Scene state ----
 let currentScene = createDefaultScene();
 const listeners = new Set<SceneListener>();
 
@@ -355,6 +378,55 @@ export const sceneStore = {
     }
     currentScene = draft;
     notify();
+  },
+
+  // ---- Series API ----
+  getSeries(): SceneSeries {
+    return structuredClone(currentSeries);
+  },
+
+  onSeriesChange(listener: SeriesListener) {
+    seriesListeners.add(listener);
+    listener(structuredClone(currentSeries));
+    return () => { seriesListeners.delete(listener); };
+  },
+
+  setSeriesTitle(title: string) {
+    currentSeries = { ...currentSeries, title };
+    notifySeries();
+  },
+
+  addSceneToSeries(scene: SceneGraph, title?: string) {
+    const tagged = { ...structuredClone(scene), seriesTitle: title };
+    const scenes = [...currentSeries.scenes, tagged];
+    currentSeries = { ...currentSeries, scenes, activeIndex: scenes.length - 1 };
+    notifySeries();
+  },
+
+  navigateSeriesTo(index: number) {
+    if (index < 0 || index >= currentSeries.scenes.length) return;
+    currentSeries = { ...currentSeries, activeIndex: index };
+    const target = structuredClone(currentSeries.scenes[index]);
+    resetSceneEvaluator();
+    resetPoseTransitions();
+    resetArcAtmosphereCache();
+    currentScene = target;
+    ensureSemanticRuntimeState(currentScene);
+    actorOverrides = {};
+    notify();
+    notifySeries();
+  },
+
+  removeSceneFromSeries(index: number) {
+    const scenes = currentSeries.scenes.filter((_, i) => i !== index);
+    const activeIndex = Math.min(currentSeries.activeIndex, Math.max(0, scenes.length - 1));
+    currentSeries = { ...currentSeries, scenes, activeIndex };
+    notifySeries();
+  },
+
+  resetSeries() {
+    currentSeries = createDefaultSeries();
+    notifySeries();
   },
 
   setPaused(paused: boolean) {

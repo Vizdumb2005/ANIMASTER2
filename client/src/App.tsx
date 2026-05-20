@@ -3,13 +3,8 @@ import PromptBar from './components/PromptBar';
 import SessionSidebar from './components/SessionSidebar';
 import DebugPanel from './components/DebugPanel';
 import CinematicControls from './components/CinematicControls';
-import PlaybackControls from './components/PlaybackControls';
-import SceneInfoOverlay from './components/SceneInfoOverlay';
-import BeatTimeline from './components/BeatTimeline';
-import BeatTimelineV2 from './components/BeatTimelineV2';
 import CameraPresets from './components/CameraPresets';
 import ActorDirector from './components/ActorDirector';
-import SceneGraphView from './components/SceneGraphView';
 import CinematicDirector from './components/CinematicDirector';
 import AIDebugPanel from './components/AIDebugPanel';
 import DemoSelector from './components/DemoSelector';
@@ -18,6 +13,13 @@ import CinematicInspector from './components/CinematicInspector';
 import ShotSelector from './components/ShotSelector';
 import EmotionalSpaceControls from './components/EmotionalSpaceControls';
 import DirectorialStyleSelector from './components/DirectorialStyleSelector';
+import SceneSeriesPanel from './components/SceneSeriesPanel';
+import DirectorWorkspace from './components/DirectorWorkspace';
+import PlaybackControls from './components/PlaybackControls';
+import SceneInfoOverlay from './components/SceneInfoOverlay';
+import BeatTimeline from './components/BeatTimeline';
+import BeatTimelineV2 from './components/BeatTimelineV2';
+import SceneGraphView from './components/SceneGraphView';
 
 export default function App() {
   return (
@@ -43,6 +45,7 @@ export default function App() {
       </section>
 
       <div className="directing-panel">
+        <DirectorWorkspace />
         <CinematicControls />
         <CameraPresets />
         <ActorDirector />
@@ -51,6 +54,7 @@ export default function App() {
         <DirectorialStyleSelector />
         <CinematicDirector />
         <DemoSelector />
+        <SceneSeriesPanel />
       </div>
 
       <SceneGraphView />

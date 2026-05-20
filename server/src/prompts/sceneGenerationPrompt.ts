@@ -154,6 +154,82 @@ export const sceneGenerationResponseSchema = {
           createdAt: { type: 'number' }
         }
       }
+    },
+    shotSequence: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'shotType', 'emotionalIntent', 'narrativePurpose', 'framing', 'camera', 'pacing', 'atmosphere', 'continuity'],
+        properties: {
+          id: { type: 'string' },
+          shotType: { enum: ['establishing', 'wide', 'medium', 'closeup', 'extreme_closeup', 'reaction', 'tracking', 'overhead', 'insert', 'isolation'] },
+          emotionalIntent: { type: 'string' },
+          narrativePurpose: { type: 'string' },
+          framing: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['composition', 'ruleOfThirds', 'depthBias', 'focalPriority'],
+            properties: {
+              composition: { type: 'string' },
+              ruleOfThirds: { type: 'boolean' },
+              depthBias: { type: 'number' },
+              focalPriority: { type: 'array', items: { type: 'string' } }
+            }
+          },
+          camera: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['angle', 'movement', 'lens', 'distance'],
+            properties: {
+              angle: { type: 'string' },
+              movement: { type: 'string' },
+              lens: { type: 'string' },
+              distance: { type: 'number' }
+            }
+          },
+          pacing: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['duration', 'intensity', 'tensionCurve'],
+            properties: {
+              duration: { type: 'number' },
+              intensity: { type: 'number' },
+              tensionCurve: { type: 'array', items: { type: 'number' } }
+            }
+          },
+          atmosphere: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['lighting', 'fogDensity', 'ambience'],
+            properties: {
+              lighting: { type: 'string' },
+              fogDensity: { type: 'number' },
+              ambience: { type: 'array', items: { type: 'string' } }
+            }
+          },
+          continuity: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['previousShotRelation', 'transitionType'],
+            properties: {
+              previousShotRelation: { type: 'string' },
+              transitionType: { enum: ['cut', 'fade', 'dissolve', 'whip_pan'] }
+            }
+          }
+        }
+      }
+    },
+    narrativeState: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['currentTheme', 'emotionalTrajectory', 'continuityTracker', 'motifOccurrences'],
+      properties: {
+        currentTheme: { type: 'string' },
+        emotionalTrajectory: { type: 'array', items: { type: 'string' } },
+        continuityTracker: { type: 'object' },
+        motifOccurrences: { type: 'object', additionalProperties: { type: 'number' } }
+      }
     }
   },
   $defs: {
@@ -205,6 +281,14 @@ Rules:
 - Valid emotions: neutral, sad, happy, nervous, excited, awkward, angry, exhausted.
 - Valid actions: idle, walking, sitting, approaching, pacing. Use 'approaching' for slow deliberate movement toward another actor.
 - Camera modes: static, follow, close_up, wide_shot, over_the_shoulder, dramatic_zoom, tension.
+
+## Phase 9 Shot Sequencing (Storyboarding)
+- ALWAYS generate a shotSequence containing a minimum of 3 shots. The sequence should translate the emotional and physical arc of the prompt.
+- Structure shots logically, e.g. establishing (wide, establish space) -> medium confrontation (focus on interaction) -> close-up/reaction (focus on character emotion/reaction).
+- Set pacing.duration (in seconds, e.g. 3 to 7 seconds), intensity, and tensionCurve (array of 0-1 numbers showing tension path, e.g. [0.1, 0.4, 0.9]).
+- Set atmosphere overrides matching the scene's progression (e.g. lighting like "harsh_shadows", fogDensity, and ambience sound tags like ["distant_wind", "ominous_hum"]).
+- Set narrativeState with theme, emotionalTrajectory (e.g. ["neutral", "tense", "sad"]), continuityTracker (containing actor positions), and motifOccurrences (e.g. {"silence": 1, "tension": 2}).
+- Maintain visual continuity: ensure screen direction (180-degree rule) is observed (e.g. character positions x do not cross boundaries unexpectedly).
 
 Schema:
 ${JSON.stringify(sceneGenerationResponseSchema, null, 2)}

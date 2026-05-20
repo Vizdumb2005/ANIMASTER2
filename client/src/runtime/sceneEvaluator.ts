@@ -9,6 +9,7 @@ import { clearHesitationState } from './acting/hesitation';
 import { ensureSemanticRuntimeState } from './semanticOperations';
 import { getRhythmRuntimeProfile, getToneRuntimeProfile } from './semanticProfiles';
 import { evaluateCameraRuntime } from './camera/cameraRuntime';
+import { evaluateShotTimeline } from './camera/shotTimelineRuntime';
 // Phase 2.6 imports
 import { resolveSpatialIntent } from './spatial/spatialIntentResolver';
 import { applyNegativeSpace } from './spatial/negativeSpaceController';
@@ -61,6 +62,7 @@ const TICK_DELTA_MS = 16;
 
 export function evaluateScene(scene: SceneGraph): SceneGraph {
   ensureSemanticRuntimeState(scene);
+  evaluateShotTimeline(scene, TICK_DELTA_MS);
   const tone = getToneRuntimeProfile(scene);
   const rhythm = getRhythmRuntimeProfile(scene);
   const currentIds = new Set(scene.actors.map((a) => a.id));
