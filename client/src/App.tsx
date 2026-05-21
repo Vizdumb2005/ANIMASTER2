@@ -20,6 +20,7 @@ import SceneInfoOverlay from './components/SceneInfoOverlay';
 import BeatTimeline from './components/BeatTimeline';
 import BeatTimelineV2 from './components/BeatTimelineV2';
 import SceneGraphView from './components/SceneGraphView';
+import ExportPanel from './components/ExportPanel';
 
 export default function App() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
         <CinematicDirector />
         <DemoSelector />
         <SceneSeriesPanel />
+      <ExportPanel />
       </div>
 
       <SceneGraphView />

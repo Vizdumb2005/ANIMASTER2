@@ -157,27 +157,30 @@ export function evaluateShotTimeline(scene: SceneGraph, deltaMs: number): void {
 function triggerShotCue(scene: SceneGraph, shot: CinematicShot): void {
   const emotionalIntent = shot.emotionalIntent.toLowerCase();
 
-  // Trigger actor state changes based on shot intent
+  // FIX: Previously, the shot timeline force-overwrote actor emotionState on
+  // every shot transition. This clobbered the AI Director's emotional arc.
+  // Now, shot cues only INFLUENCE emotion — they nudge intensity and
+  // add semantic tags rather than replacing the emotion state.
+
   scene.actors.forEach((actor, index) => {
-    // 1. Shift emotion
+    // Influence emotion intensity based on shot emotional intent
     if (emotionalIntent.includes('sad')) {
-      actor.emotionState = 'sad';
+      actor.emotionIntensity = Math.min(1, (actor.emotionIntensity ?? 0.5) + 0.1);
     } else if (emotionalIntent.includes('tense') || emotionalIntent.includes('nervous')) {
-      actor.emotionState = 'nervous';
+      actor.emotionIntensity = Math.min(1, (actor.emotionIntensity ?? 0.5) + 0.15);
     } else if (emotionalIntent.includes('angry') || emotionalIntent.includes('combat')) {
-      actor.emotionState = 'angry';
+      actor.emotionIntensity = Math.min(1, (actor.emotionIntensity ?? 0.5) + 0.2);
     } else if (emotionalIntent.includes('happy') || emotionalIntent.includes('warm')) {
-      actor.emotionState = 'happy';
+      actor.emotionIntensity = Math.max(0, (actor.emotionIntensity ?? 0.5) - 0.1);
     } else if (emotionalIntent.includes('exhausted')) {
-      actor.emotionState = 'exhausted';
+      actor.emotionIntensity = Math.max(0, (actor.emotionIntensity ?? 0.5) - 0.15);
     }
 
-    // 2. Action changes: E.g., reaction shot trigger lookTarget, or establish shot triggers movement
+    // Action cues remain unchanged (these don't conflict with emotion state)
     if (shot.shotType === 'reaction' && index === 1 && scene.actors[0]) {
-      // Look at the speaking/acting stickman
       actor.currentAction = 'idle';
       if (actor.joints) {
-        actor.joints.head.x = actor.position.x - 2; // slight head turn
+        actor.joints.head.x = actor.position.x - 2;
       }
     }
   });

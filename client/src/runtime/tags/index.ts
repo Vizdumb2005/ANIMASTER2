@@ -1,0 +1,1 @@
+export { applyTag, removeTag, getActiveTags, registerTag, getTagDefinition, getBuiltInTagNames } from './SemanticTagSystem';

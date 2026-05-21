@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { sceneStore } from '../../store/sceneStore';
 import { startTickLoop } from '../../runtime/tickLoop';
 import { evaluateActor } from '../../runtime/actorEvaluator';
 import { evaluateScene } from '../../runtime/sceneEvaluator';
+import { getVideoExporter } from '../../runtime/export/VideoExporter';
 import type { SceneGraph } from '@animaster/shared/scene';
 
 import EnvironmentMesh from './EnvironmentMesh';
@@ -14,6 +15,16 @@ import SceneLighting from './SceneLighting';
 import SceneProps from './SceneProps';
 import SceneCameraController from './SceneCamera';
 import ScenePostProcessing from './ScenePostProcessing';
+
+/** Inner component that registers the Three.js canvas with the export pipeline */
+function CanvasExporterBridge() {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    const exporter = getVideoExporter();
+    exporter.setSourceCanvas(gl.domElement);
+  }, [gl]);
+  return null;
+}
 
 export default function CinematicScene() {
   const [scene, setScene] = useState<SceneGraph>(sceneStore.getScene());
@@ -113,6 +124,8 @@ export default function CinematicScene() {
 
         {/* Post-processing */}
         <ScenePostProcessing tone={tone} tensionLevel={tensionLevel} />
+      {/* Bridge: registers canvas with export pipeline */}
+      <CanvasExporterBridge />
       </Canvas>
     </div>
   );

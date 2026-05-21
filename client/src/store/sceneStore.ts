@@ -331,26 +331,49 @@ export const sceneStore = {
     );
 
     if (hasMeaningfulChanges) {
-      // Phase 2.6 fields are computed at runtime — clear them so they recompute
-      draft.emotionalSpatial = undefined;
-      draft.dramaticBeats = undefined;
-      draft.shotIntent = undefined;
-      draft.attentionFocus = undefined;
-      draft.compositionMetrics = undefined;
-      draft.powerDynamics = undefined;
-      draft.tensionState = undefined;
-      draft.anticipationState = undefined;
-      // Phase 2.7 fields — clear so they reinitialize from new tone
-      resetPoseTransitions();
-      resetArcAtmosphereCache();
-      draft.beatSequence = undefined;
-      draft.emotionalArc = undefined;
-      draft.reactionChains = undefined;
-      draft.storyAnchors = undefined;
-      draft.sceneEvolution = undefined;
-      draft.cinematicMomentScore = undefined;
-      // Phase 3 fields — clear so they recompute from new tone
-      draft.environmentReaction = undefined;
+      // Selective state clearing: only reset fields directly affected by the mutation.
+      // FIX: Previously, ALL derived state was cleared on every mutation, causing
+      // emotional arcs, tension, and narrative progression to reset mid-scene.
+      // Now, only fields whose inputs actually changed are cleared.
+
+      if (patch.cinematicGrammar || patch.atmosphere) {
+        // Tone/atmosphere changes require recomputing emotional arcs and atmosphere effects
+        draft.emotionalArc = undefined;
+        draft.environmentReaction = undefined;
+        resetArcAtmosphereCache();
+      }
+
+      if (patch.camera || patch.cinematicGrammar) {
+        // Camera changes require recomputing shot intent and composition
+        draft.shotIntent = undefined;
+        draft.compositionMetrics = undefined;
+      }
+
+      if (Array.isArray(patch.actors)) {
+        // Actor changes require recomputing spatial relationships and tension
+        draft.emotionalSpatial = undefined;
+        draft.powerDynamics = undefined;
+        draft.tensionState = undefined;
+        draft.attentionFocus = undefined;
+      }
+
+      if (Array.isArray(patch.relationships)) {
+        // Relationship changes affect dramatic beats and reactions
+        draft.dramaticBeats = undefined;
+        draft.reactionChains = undefined;
+      }
+
+      if (patch.rhythm) {
+        // Rhythm changes affect beat timing
+        draft.beatSequence = undefined;
+        draft.anticipationState = undefined;
+      }
+
+      // These fields are NEVER cleared on mutation — they represent accumulated
+      // narrative state that must persist across edits:
+      // - storyAnchors (world-building)
+      // - sceneEvolution (narrative progression)
+      // - cinematicMomentScore (peak moments)
     }
 
     cleanupActorOverrides(draft);

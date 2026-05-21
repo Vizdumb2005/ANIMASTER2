@@ -5,6 +5,10 @@ export const FIXED_DELTA_MS = 1000 / 60;
 
 export function startTickLoop(onTick: (deltaMs: number) => void) {
   if (running) {
+    // SAFETY: Previously returned stopTickLoop, which would give the caller
+    // a function that kills the existing loop. Now we throw to prevent
+    // dual-loop scenarios (CanvasView + CinematicScene both starting loops).
+    console.warn('startTickLoop: loop already running — returning existing stop function');
     return stopTickLoop;
   }
 
