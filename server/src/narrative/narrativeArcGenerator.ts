@@ -1,7 +1,7 @@
 // Narrative Arc Generator for 1-minute cinematic shorts
 // Phase 10: Vertical Slice - "The Last Train"
 
-import { SceneTone } from '../../../shared/src/scene.js';
+import { SceneTone } from '../types/sharedTypes.js';
 
 export interface NarrativeArc {
   id: string;

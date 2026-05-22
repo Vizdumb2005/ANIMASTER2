@@ -10,8 +10,10 @@ import type {
   DialogueRequest,
   EnvironmentIntentRequest,
   CameraIntentRequest,
-  BlockingIntentRequest
+  BlockingIntentRequest,
+  AIError
 } from './providerInterface.js';
+import { err, ok, Result } from '../../types/result.js';
 import {
   buildScenePlanPrompt,
   buildMutationPlanPrompt,
@@ -35,7 +37,7 @@ export class OllamaProvider implements AIProvider {
     return this._isAvailable;
   }
 
-  async initialize(config: AIProviderConfig): Promise<void> {
+  async initialize(config: AIProviderConfig): Promise<Result<void, AIError>> {
     this.model = config.model ?? 'llama3.2';
     this.baseUrl = config.baseUrl ?? 'http://localhost:11434';
     this.maxTokens = config.maxTokens ?? 4096;
@@ -48,14 +50,16 @@ export class OllamaProvider implements AIProvider {
       const result = await fetch(`${this.baseUrl}/api/tags`, { signal: controller.signal });
       clearTimeout(timeout);
       this._isAvailable = result.ok;
-    } catch {
+      return ok(undefined);
+    } catch (error) {
       this._isAvailable = false;
+      return err({ message: error instanceof Error ? error.message : 'Ollama server not reachable' });
     }
   }
 
-  async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
+  async complete(request: AICompletionRequest): Promise<Result<AICompletionResponse, AIError>> {
     if (!this._isAvailable) {
-      throw new Error('Ollama provider not available — server not reachable');
+      return err({ message: 'Ollama provider not available — server not reachable' });
     }
 
     const controller = new AbortController();
@@ -90,7 +94,7 @@ export class OllamaProvider implements AIProvider {
       });
 
       if (!result.ok) {
-        throw new Error(`Ollama request failed: ${result.status}`);
+        return err({ message: `Ollama request failed: ${result.status}` });
       }
 
       const payload = (await result.json()) as {
@@ -99,19 +103,21 @@ export class OllamaProvider implements AIProvider {
         prompt_eval_count?: number;
       };
 
-      return {
+      return ok({
         content: payload.response ?? '',
         model: this.model,
         provider: this.name,
         tokensUsed: (payload.eval_count ?? 0) + (payload.prompt_eval_count ?? 0),
         latencyMs: Date.now() - start
-      };
+      });
+    } catch (error) {
+      return err({ message: error instanceof Error ? error.message : 'Unknown error in Ollama provider' });
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  async generateScenePlan(request: CinematicPlanRequest): Promise<AICompletionResponse> {
+  async generateScenePlan(request: CinematicPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildScenePlanPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -119,7 +125,7 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  async generateMutationPlan(request: MutationPlanRequest): Promise<AICompletionResponse> {
+  async generateMutationPlan(request: MutationPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildMutationPlanPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -127,7 +133,7 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  async generateDialogue(request: DialogueRequest): Promise<AICompletionResponse> {
+  async generateDialogue(request: DialogueRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildDialoguePrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -135,7 +141,7 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<AICompletionResponse> {
+  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildEnvironmentPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -143,7 +149,7 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  async generateBlockingIntent(request: BlockingIntentRequest): Promise<AICompletionResponse> {
+  async generateBlockingIntent(request: BlockingIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildBlockingPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -151,7 +157,7 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  async generateCameraIntent(request: CameraIntentRequest): Promise<AICompletionResponse> {
+  async generateCameraIntent(request: CameraIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildCameraPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -159,7 +165,7 @@ export class OllamaProvider implements AIProvider {
     });
   }
 
-  async summarizeSceneMemory(sceneJson: string): Promise<AICompletionResponse> {
+  async summarizeSceneMemory(sceneJson: string): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildMemorySummaryPrompt(sceneJson);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],

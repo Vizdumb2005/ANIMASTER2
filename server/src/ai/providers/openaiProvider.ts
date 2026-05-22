@@ -1,5 +1,6 @@
 // Phase 7 — Task Group 1: OpenAI Provider
 
+import { err, ok, Result } from '../../types/result.js';
 import type {
   AIProvider,
   AIProviderConfig,
@@ -10,7 +11,8 @@ import type {
   DialogueRequest,
   EnvironmentIntentRequest,
   CameraIntentRequest,
-  BlockingIntentRequest
+  BlockingIntentRequest,
+  AIError
 } from './providerInterface.js';
 import {
   buildScenePlanPrompt,
@@ -36,7 +38,7 @@ export class OpenAIProvider implements AIProvider {
     return this._isAvailable;
   }
 
-  async initialize(config: AIProviderConfig): Promise<void> {
+  async initialize(config: AIProviderConfig): Promise<Result<void, AIError>> {
     this.apiKey = config.apiKey ?? '';
     this.model = config.model ?? 'gpt-4o-mini';
     this.baseUrl = config.baseUrl ?? 'https://api.openai.com/v1';
@@ -44,11 +46,12 @@ export class OpenAIProvider implements AIProvider {
     this.defaultTemperature = config.temperature ?? 0.2;
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this._isAvailable = this.apiKey.length > 0;
+    return ok(undefined);
   }
 
-  async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
+  async complete(request: AICompletionRequest): Promise<Result<AICompletionResponse, AIError>> {
     if (!this._isAvailable) {
-      throw new Error('OpenAI provider not available — no API key configured');
+      return err({ message: 'OpenAI provider not available — no API key configured' });
     }
 
     const controller = new AbortController();
@@ -87,7 +90,7 @@ export class OpenAIProvider implements AIProvider {
       });
 
       if (!result.ok) {
-        throw new Error(`OpenAI request failed: ${result.status}`);
+        return err({ message: `OpenAI request failed: ${result.status}` });
       }
 
       const payload = (await result.json()) as {
@@ -96,19 +99,19 @@ export class OpenAIProvider implements AIProvider {
       };
 
       const content = payload.choices?.[0]?.message?.content ?? '';
-      return {
+      return ok({
         content,
         model: this.model,
         provider: this.name,
         tokensUsed: payload.usage?.total_tokens,
         latencyMs: Date.now() - start
-      };
+      });
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  async generateScenePlan(request: CinematicPlanRequest): Promise<AICompletionResponse> {
+  async generateScenePlan(request: CinematicPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildScenePlanPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -116,7 +119,7 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async generateMutationPlan(request: MutationPlanRequest): Promise<AICompletionResponse> {
+  async generateMutationPlan(request: MutationPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildMutationPlanPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -124,7 +127,7 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async generateDialogue(request: DialogueRequest): Promise<AICompletionResponse> {
+  async generateDialogue(request: DialogueRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildDialoguePrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -132,7 +135,7 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<AICompletionResponse> {
+  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildEnvironmentPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -140,7 +143,7 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async generateBlockingIntent(request: BlockingIntentRequest): Promise<AICompletionResponse> {
+  async generateBlockingIntent(request: BlockingIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildBlockingPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -148,7 +151,7 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async generateCameraIntent(request: CameraIntentRequest): Promise<AICompletionResponse> {
+  async generateCameraIntent(request: CameraIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildCameraPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -156,7 +159,7 @@ export class OpenAIProvider implements AIProvider {
     });
   }
 
-  async summarizeSceneMemory(sceneJson: string): Promise<AICompletionResponse> {
+  async summarizeSceneMemory(sceneJson: string): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildMemorySummaryPrompt(sceneJson);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],

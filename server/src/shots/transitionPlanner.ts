@@ -4,6 +4,7 @@
 import { SequencedShot } from './shotSequencer.js';
 
 export interface TransitionPlan {
+  id: string;
   fromShotId: string;
   toShotId: string;
   type: TransitionType;
@@ -100,6 +101,7 @@ function createTransitionPlan(
   const continuityChecks = performContinuityChecks(fromShot, toShot, transitionType);
   
   return {
+    id: `transition_${fromShot.id}_to_${toShot.id}`,
     fromShotId: fromShot.id,
     toShotId: toShot.id,
     type: transitionType,

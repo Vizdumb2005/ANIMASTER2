@@ -1,7 +1,7 @@
 // Emotional Progression System for 1-minute cinematic shorts
 // Phase 10: Vertical Slice
 
-import { ActorEmotion } from '../../../shared/src/scene.js';
+import { ActorEmotion } from '../types/sharedTypes.js';
 import { EmotionalBeat } from './narrativeArcGenerator.js';
 
 export interface EmotionalState {

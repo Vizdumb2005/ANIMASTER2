@@ -17,6 +17,7 @@ export interface RenderConfig {
   audioTrack?: AudioTrackConfig;
   watermark?: WatermarkConfig;
   metadata?: RenderMetadata;
+  duration: number; // seconds
 }
 
 export interface AudioTrackConfig {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { providerRegistry } from '../ai/providers/providerRegistry.js';
 import { orchestrator } from '../ai/runtime/orchestrator.js';
 import type { ProviderName } from '../ai/providers/providerInterface.js';
+import { isOk, isErr } from '../types/result.js';
 import { getDirectorIntentAdjustments, type DirectorIntent } from '../ai/directing/directorIntent.js';
 import {
   buildSceneGenerationUserPrompt,
@@ -9,7 +10,8 @@ import {
   sceneGenerationSystemPrompt
 } from '../prompts/sceneGenerationPrompt.js';
 import { planScene } from '../planning/scenePlanner.js';
-import { generateShotSequence } from '../planning/shotSequencer.js';
+import { generateShotSequence, NarrativeState } from '../planning/shotSequencer.js';
+import { SequencedShot } from '../shots/shotSequencer.js';
 
 type SceneGraphResponse = {
   id: string;
@@ -149,29 +151,33 @@ async function interpretPrompt(prompt: string, directing?: DirectingContext): Pr
   }
 
   let parsed: SceneGraphResponse;
-  try {
-    const completion = await provider.complete({
-      messages: [
-        { role: 'system', content: sceneGenerationSystemPrompt },
-        { role: 'user', content: buildSceneGenerationUserPrompt(prompt, context) }
-      ],
-      temperature: 0.2,
-      maxTokens: 2000,
-      responseFormat: 'json',
-      jsonSchema: sceneGenerationResponseSchema
-    });
+  const completionResult = await provider.complete({
+    messages: [
+      { role: 'system', content: sceneGenerationSystemPrompt },
+      { role: 'user', content: buildSceneGenerationUserPrompt(prompt, context) }
+    ],
+    temperature: 0.2,
+    maxTokens: 2000,
+    responseFormat: 'json',
+    jsonSchema: sceneGenerationResponseSchema
+  });
 
-    if (!completion.content || !completion.content.trim()) {
-      throw new Error('Provider response was empty');
-    }
-
-    parsed = JSON.parse(completion.content) as SceneGraphResponse;
-  } catch (error) {
-    console.error('Scene generation failed, using fallback', error);
+  if (isErr(completionResult)) {
+    console.error('Scene generation failed, using fallback', completionResult.error);
     const fallback = createFallbackScene(prompt);
     fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
     return fallback;
   }
+
+  const completion = completionResult.value;
+  if (!completion.content || !completion.content.trim()) {
+    console.error('Provider response was empty');
+    const fallback = createFallbackScene(prompt);
+    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
+    return fallback;
+  }
+
+  parsed = JSON.parse(completion.content) as SceneGraphResponse;
 
   const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
   const worldPlan = resolveWorldPlan(prompt, actorCount, orchestration.scenePlan);
@@ -452,10 +458,10 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
 }
 
 function normalizeSceneGraph(
-  scene: SceneGraphResponse & { shotSequence?: any[]; narrativeState?: any },
+  scene: SceneGraphResponse & { shotSequence?: SequencedShot[]; narrativeState?: NarrativeState },
   prompt: string,
   worldPlanOverride?: SceneGraphResponse['worldPlan']
-): SceneGraphResponse & { shotSequence?: any[]; narrativeState?: any } {
+): SceneGraphResponse & { shotSequence?: SequencedShot[]; narrativeState?: NarrativeState } {
   const fallback = createFallbackScene(prompt);
 
   const shotsInfo = (scene.shotSequence && scene.shotSequence.length > 0)

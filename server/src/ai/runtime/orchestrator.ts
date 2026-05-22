@@ -3,6 +3,7 @@
 
 import { providerRegistry } from '../providers/providerRegistry.js';
 import type { ProviderName, TaskComplexity } from '../providers/providerInterface.js';
+import { isOk, isErr } from '../../types/result.js';
 import { compileIntent, type CinematicIntent } from '../compiler/intentCompiler.js';
 import { planCinematography } from '../agents/cinematographerAgent.js';
 import { planEnvironment } from '../agents/environmentAgent.js';
@@ -247,25 +248,24 @@ export class AIOrchestrator {
         continue;
       }
 
-      try {
-        reasoning.push(`Trying ${providerName}...`);
-        const { system, user } = buildScenePlanPrompt({ prompt, actorCount: this.estimateActorCount(prompt) });
-        const response = await provider.complete({
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user }
-          ],
-          temperature: 0.7,
-          maxTokens: 2000,
-          responseFormat: 'json'
-        });
+      reasoning.push(`Trying ${providerName}...`);
+      const { system, user } = buildScenePlanPrompt({ prompt, actorCount: this.estimateActorCount(prompt) });
+      const response = await provider.complete({
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ],
+        temperature: 0.7,
+        maxTokens: 2000,
+        responseFormat: 'json'
+      });
 
-        const plan = JSON.parse(response.content) as Record<string, unknown>;
-        reasoning.push(`${providerName}: success (${response.tokensUsed ?? 0} tokens)`);
+      if (isOk(response)) {
+        const plan = JSON.parse(response.value.content) as Record<string, unknown>;
+        reasoning.push(`${providerName}: success (${response.value.tokensUsed ?? 0} tokens)`);
         return { plan, provider: providerName, fallback: providerName === 'mock' };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        reasoning.push(`${providerName}: failed (${msg})`);
+      } else {
+        reasoning.push(`${providerName}: failed (${response.error.message})`);
       }
     }
 
@@ -293,24 +293,23 @@ export class AIOrchestrator {
 
       if (!provider.isAvailable) continue;
 
-      try {
-        const { system, user } = buildMutationPlanPrompt({ prompt, currentSceneJson: '{}' });
-        const response = await provider.complete({
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user + contextSuffix }
-          ],
-          temperature: 0.7,
-          maxTokens: 1500,
-          responseFormat: 'json'
-        });
+      const { system, user } = buildMutationPlanPrompt({ prompt, currentSceneJson: '{}' });
+      const response = await provider.complete({
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user + contextSuffix }
+        ],
+        temperature: 0.7,
+        maxTokens: 1500,
+        responseFormat: 'json'
+      });
 
-        const plan = JSON.parse(response.content) as Record<string, unknown>;
+      if (isOk(response)) {
+        const plan = JSON.parse(response.value.content) as Record<string, unknown>;
         reasoning.push(`${providerName}: mutation success`);
         return { plan, provider: providerName, fallback: providerName === 'mock' };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        reasoning.push(`${providerName}: mutation failed (${msg})`);
+      } else {
+        reasoning.push(`${providerName}: mutation failed (${response.error.message})`);
       }
     }
 

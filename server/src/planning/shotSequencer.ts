@@ -1,6 +1,8 @@
 // Phase 9 — Shot Sequencing System
 // Types inlined from shared to avoid cross-package import issues under NodeNext
 
+import { SequencedShot } from '../shots/shotSequencer.js';
+
 export type ShotType =
   | 'establishing'
   | 'wide'
@@ -59,7 +61,7 @@ export interface CinematicShot {
 export interface NarrativeState {
   currentTheme: string;
   emotionalTrajectory: string[];
-  continuityTracker: Record<string, unknown>;
+  continuityTracker: Record<string, { initialX: number; initialY: number; screenSide: 'left' | 'right' }>;
   motifOccurrences: Record<string, number>;
 }
 
@@ -85,7 +87,7 @@ export function deriveAtmosphereAudio(shot: CinematicShot): AtmosphereAudio {
 interface ActorPosition { x: number; y: number; }
 interface Actor { id: string; position: ActorPosition; }
 
-export function generateShotSequence(prompt: string, actors: Actor[]): { shotSequence: CinematicShot[]; narrativeState: NarrativeState } {
+export function generateShotSequence(prompt: string, actors: Actor[]): { shotSequence: SequencedShot[]; narrativeState: NarrativeState } {
   const p = prompt.toLowerCase();
   let theme = 'observational';
   let trajectory = ['neutral'];
@@ -112,11 +114,11 @@ export function generateShotSequence(prompt: string, actors: Actor[]): { shotSeq
   }
 
   // Create shots
-  const shots: CinematicShot[] = [];
+  const cinematicShots: CinematicShot[] = [];
   const actorIds = actors.map((a) => a.id);
 
   // Shot 1: Establishing wide shot
-  shots.push({
+  cinematicShots.push({
     id: 'shot_1_establishing',
     shotType: 'establishing',
     emotionalIntent: trajectory[0] ?? 'neutral',
@@ -151,7 +153,7 @@ export function generateShotSequence(prompt: string, actors: Actor[]): { shotSeq
 
   // Shot 2: Medium shot focusing on the core activity/interaction
   const activeShotType: ShotType = actors.length >= 2 ? 'medium' : 'isolation';
-  shots.push({
+  cinematicShots.push({
     id: 'shot_2_action',
     shotType: activeShotType,
     emotionalIntent: trajectory[1] ?? trajectory[0] ?? 'neutral',
@@ -185,7 +187,7 @@ export function generateShotSequence(prompt: string, actors: Actor[]): { shotSeq
   });
 
   // Shot 3: Close-up reaction shot
-  shots.push({
+  cinematicShots.push({
     id: 'shot_3_reaction',
     shotType: 'reaction',
     emotionalIntent: trajectory[2] ?? trajectory[1] ?? trajectory[0] ?? 'neutral',
@@ -220,7 +222,7 @@ export function generateShotSequence(prompt: string, actors: Actor[]): { shotSeq
 
   // Shot 4: Silence / payoff beat (for high-intensity themes)
   if (theme === 'confrontation' || theme === 'suspense' || theme === 'isolation') {
-    shots.push({
+    cinematicShots.push({
       id: 'shot_4_silence',
       shotType: theme === 'isolation' ? 'wide' : 'medium',
       emotionalIntent: 'resigned',
@@ -258,7 +260,7 @@ export function generateShotSequence(prompt: string, actors: Actor[]): { shotSeq
   // Continuity check: Ensure screen direction (180-degree rule)
   // Enforce that actor 0 is on the left and actor 1 is on the right
   // and they don't swap screen positions between shots.
-  const continuityTracker: Record<string, unknown> = {};
+  const continuityTracker: Record<string, { initialX: number; initialY: number; screenSide: 'left' | 'right' }> = {};
   actors.forEach((actor) => {
     continuityTracker[actor.id] = {
       initialX: actor.position.x,
@@ -273,6 +275,46 @@ export function generateShotSequence(prompt: string, actors: Actor[]): { shotSeq
     continuityTracker,
     motifOccurrences: motifs,
   };
+
+  // Convert CinematicShot[] to SequencedShot[]
+  const shots: SequencedShot[] = cinematicShots.map((shot, index) => ({
+    id: shot.id,
+    shotType: shot.shotType,
+    emotionalIntent: shot.emotionalIntent,
+    narrativePurpose: shot.narrativePurpose,
+    durationSeconds: shot.pacing.duration,
+    cameraSpecs: {
+      angle: shot.camera.angle as any,
+      movement: shot.camera.movement as any,
+      lens: shot.camera.lens as any,
+      distance: shot.camera.distance,
+      speed: 0.5 // default speed
+    },
+    framing: {
+      composition: shot.framing.composition as any,
+      ruleOfThirds: shot.framing.ruleOfThirds,
+      depthBias: shot.framing.depthBias,
+      focalPriority: shot.framing.focalPriority,
+      headroom: 0.3,
+      lookRoom: 0.4
+    },
+    transition: {
+      type: 'cut',
+      durationSeconds: 0.5,
+      emotionalEffect: 'standard cut',
+      timing: 'precise'
+    },
+    emotionalWeight: 0.5,
+    sequencePosition: index,
+    startTimeSeconds: index * 5, // approximate timing
+    endTimeSeconds: (index + 1) * 5,
+    emotionalContext: {
+      primaryEmotion: shot.emotionalIntent,
+      intensity: shot.pacing.intensity,
+      physicalManifestation: 'neutral',
+      gazeDirection: 'center'
+    }
+  }));
 
   return { shotSequence: shots, narrativeState };
 }

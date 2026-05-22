@@ -4,6 +4,7 @@
 import { SequencedShot } from '../../../server/src/shots/shotSequencer';
 import { TransitionPlan } from '../../../server/src/shots/transitionPlanner';
 import { EmotionalBeat } from '../../../server/src/narrative/narrativeArcGenerator';
+import { AtmosphereProfile } from '../../../shared/src/scene';
 
 export interface TimelineState {
   currentTimeSeconds: number;
@@ -32,11 +33,13 @@ export interface CinematicParameters {
   visualComplexity: number; // 0-1
 }
 
-export interface TimelineEvent {
-  timeSeconds: number;
-  type: 'shot_start' | 'shot_end' | 'transition_start' | 'transition_end' | 'emotional_beat' | 'atmosphere_change';
-  data: any;
-}
+export type TimelineEvent =
+  | { timeSeconds: number; type: 'shot_start'; data: { shot: SequencedShot; index: number } }
+  | { timeSeconds: number; type: 'shot_end'; data: { shot: SequencedShot; index: number } }
+  | { timeSeconds: number; type: 'transition_start'; data: { transition: TransitionPlan; index: number } }
+  | { timeSeconds: number; type: 'transition_end'; data: { transition: TransitionPlan; index: number } }
+  | { timeSeconds: number; type: 'emotional_beat'; data: { beat: EmotionalBeat; index: number } }
+  | { timeSeconds: number; type: 'atmosphere_change'; data: { atmosphere: AtmosphereProfile } };
 
 export class CinematicTimeline {
   private shots: SequencedShot[];
@@ -279,14 +282,14 @@ export class CinematicTimeline {
     }
     
     // Calculate parameters based on shot
-    const cameraTightness = 1 - currentShot.cameraSpecs.distance; // 0=wide, 1=close
-    const movementEnergy = currentShot.cameraSpecs.speed;
+    let cameraTightness = 1 - currentShot.cameraSpecs.distance; // 0=wide, 1=close
+    let movementEnergy = currentShot.cameraSpecs.speed;
     
     // Editing pace based on shot duration (shorter = faster editing)
-    const editingPace = 1 - (currentShot.durationSeconds / 15); // Normalize to 0-1
+    let editingPace = 1 - (currentShot.durationSeconds / 15); // Normalize to 0-1
     
     // Audio density based on emotional intensity
-    const audioDensity = currentShot.emotionalWeight * 0.7 + 0.3;
+    let audioDensity = currentShot.emotionalWeight * 0.7 + 0.3;
     
     // Visual complexity based on shot type and framing
     let visualComplexity = 0.5;
@@ -455,5 +458,10 @@ Current Shot: ${currentShot ? `${currentShot.shotType} (${currentShot.sequencePo
 Current Transition: ${currentTransition ? currentTransition.type : 'None'}
 Emotion: ${this.state.emotionalState.primaryEmotion} (${(this.state.emotionalState.intensity * 100).toFixed(0)}%)
   `.trim();
+  }
+
+
+  public getShots(): SequencedShot[] {
+    return this.shots;
   }
 }

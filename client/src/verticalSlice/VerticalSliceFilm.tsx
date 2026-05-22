@@ -8,10 +8,42 @@ import { RuntimeShotController } from '../timeline/runtimeShotController';
 import { FrameCaptureSystem } from '../export/frameCapture';
 import { TimelineRenderer } from '../export/timelineRenderer';
 import { VideoAssembler } from '../export/videoAssembler';
+import { CameraSpecs, FramingSpecs } from '../../../server/src/shots/shotPlanner';
+import { PacingAnalysis } from '../../../server/src/shots/pacingPlanner';
+
+interface FilmCompletionData {
+  shots: Array<{
+    id: string;
+    shotType: string;
+    emotionalIntent: string;
+    narrativePurpose: string;
+    duration: number;
+    framing: FramingSpecs;
+    camera: CameraSpecs;
+    pacing: PacingAnalysis;
+  }>;
+  emotionalArc: Array<{
+    time: number;
+    emotion: string;
+    intensity: number;
+  }>;
+  atmosphere: {
+    effects: string[];
+    lighting: string;
+    audio: string[];
+  };
+  totalDuration: number;
+  frameCount: number;
+  resolution: { width: number; height: number };
+  frameRate: number;
+  url: string;
+  format: string;
+  duration: number;
+}
 
 interface VerticalSliceFilmProps {
   prompt?: string;
-  onFilmComplete?: (filmData: any) => void;
+  onFilmComplete?: (filmData: FilmCompletionData) => void;
   onProgressUpdate?: (progress: number, stage: string) => void;
 }
 
@@ -36,7 +68,7 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
   const timelineRendererRef = useRef<TimelineRenderer | null>(null);
   const videoAssemblerRef = useRef<VideoAssembler | null>(null);
   
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
   
   // Initialize systems
@@ -379,6 +411,7 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
       frameRate: 30,
       quality: 0.8,
       includeAudio: false,
+      duration: 60, // 1 minute
       metadata: {
         title: 'The Last Train',
         description: 'A lonely man waits at an empty train station at night during rain.',
@@ -404,11 +437,25 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
             onProgressUpdate?.(1, 'rendered');
             
             // Notify completion
+            const resolutionParts = output.resolution.split('x');
             onFilmComplete?.({
+              shots: [], // Would be populated with actual shot data in real implementation
+              emotionalArc: [], // Would be populated with emotional arc data
+              atmosphere: {
+                effects: [],
+                lighting: 'cinematic',
+                audio: []
+              },
+              totalDuration: output.duration,
+              frameCount: output.duration * config.frameRate,
+              resolution: {
+                width: parseInt(resolutionParts[0] || '1920'),
+                height: parseInt(resolutionParts[1] || '1080')
+              },
+              frameRate: config.frameRate,
               url: output.url,
-              duration: output.duration,
               format: output.format,
-              resolution: output.resolution
+              duration: output.duration
             });
           }
         }

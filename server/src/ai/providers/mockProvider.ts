@@ -10,16 +10,19 @@ import type {
   DialogueRequest,
   EnvironmentIntentRequest,
   CameraIntentRequest,
-  BlockingIntentRequest
+  BlockingIntentRequest,
+  AIError
 } from './providerInterface.js';
+import { err, ok, Result } from '../../types/result.js';
 import { compileIntent } from '../compiler/intentCompiler.js';
 
 export class MockProvider implements AIProvider {
   readonly name = 'mock';
   readonly isAvailable = true;
 
-  async initialize(_config: AIProviderConfig): Promise<void> {
+  async initialize(_config: AIProviderConfig): Promise<Result<void, AIError>> {
     // Mock provider is always available
+    return ok(undefined);
   }
 
   private wrap(content: string, start: number): AICompletionResponse {
@@ -32,13 +35,13 @@ export class MockProvider implements AIProvider {
     };
   }
 
-  async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
+  async complete(request: AICompletionRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const userMsg = request.messages.find(m => m.role === 'user')?.content ?? '';
-    return this.wrap(JSON.stringify({ echo: userMsg }), start);
+    return ok(this.wrap(JSON.stringify({ echo: userMsg }), start));
   }
 
-  async generateScenePlan(request: CinematicPlanRequest): Promise<AICompletionResponse> {
+  async generateScenePlan(request: CinematicPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const intent = compileIntent(request.prompt);
     const plan = {
@@ -55,10 +58,10 @@ export class MockProvider implements AIProvider {
       visualIsolation: intent.visualIsolation,
       dialogueEnergy: intent.dialogueEnergy
     };
-    return this.wrap(JSON.stringify(plan), start);
+    return ok(this.wrap(JSON.stringify(plan), start));
   }
 
-  async generateMutationPlan(request: MutationPlanRequest): Promise<AICompletionResponse> {
+  async generateMutationPlan(request: MutationPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const intent = compileIntent(request.prompt);
     const mutations = {
@@ -69,10 +72,10 @@ export class MockProvider implements AIProvider {
       cameraChange: intent.cameraAggression > 0.5 ? 'tighten' : 'hold',
       reasoning: `Mock mutation for: ${request.prompt}`
     };
-    return this.wrap(JSON.stringify(mutations), start);
+    return ok(this.wrap(JSON.stringify(mutations), start));
   }
 
-  async generateDialogue(request: DialogueRequest): Promise<AICompletionResponse> {
+  async generateDialogue(request: DialogueRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const lines = request.characters.map(c => ({
       actorId: c.id,
@@ -80,10 +83,10 @@ export class MockProvider implements AIProvider {
       delivery: c.emotion === 'angry' ? 'sharp' : c.emotion === 'sad' ? 'quiet' : 'measured',
       pauseAfterMs: request.tone === 'tense' ? 800 : 1200
     }));
-    return this.wrap(JSON.stringify({ lines, tone: request.tone }), start);
+    return ok(this.wrap(JSON.stringify({ lines, tone: request.tone }), start));
   }
 
-  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<AICompletionResponse> {
+  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const intent = compileIntent(request.prompt);
     const envIntent = {
@@ -93,10 +96,10 @@ export class MockProvider implements AIProvider {
       compositionStyle: intent.compositionStyle,
       mood: intent.emotionalPressure > 0.6 ? 'oppressive' : 'neutral'
     };
-    return this.wrap(JSON.stringify(envIntent), start);
+    return ok(this.wrap(JSON.stringify(envIntent), start));
   }
 
-  async generateBlockingIntent(request: BlockingIntentRequest): Promise<AICompletionResponse> {
+  async generateBlockingIntent(request: BlockingIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const intent = compileIntent(request.prompt);
     const blocking = {
@@ -107,10 +110,10 @@ export class MockProvider implements AIProvider {
         spacing: intent.compositionStyle === 'compressed' ? 'close' : 'standard'
       }))
     };
-    return this.wrap(JSON.stringify(blocking), start);
+    return ok(this.wrap(JSON.stringify(blocking), start));
   }
 
-  async generateCameraIntent(request: CameraIntentRequest): Promise<AICompletionResponse> {
+  async generateCameraIntent(request: CameraIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     const intent = compileIntent(request.prompt);
     const cameraIntent = {
@@ -119,10 +122,10 @@ export class MockProvider implements AIProvider {
       framing: request.actorCount > 1 ? 'two_shot' : 'single',
       urgency: intent.cameraAggression
     };
-    return this.wrap(JSON.stringify(cameraIntent), start);
+    return ok(this.wrap(JSON.stringify(cameraIntent), start));
   }
 
-  async summarizeSceneMemory(sceneJson: string): Promise<AICompletionResponse> {
+  async summarizeSceneMemory(sceneJson: string): Promise<Result<AICompletionResponse, AIError>> {
     const start = Date.now();
     let scene: Record<string, unknown>;
     try {
@@ -138,7 +141,7 @@ export class MockProvider implements AIProvider {
       visualMotifs: [],
       unresolvedTensions: []
     };
-    return this.wrap(JSON.stringify(summary), start);
+    return ok(this.wrap(JSON.stringify(summary), start));
   }
 }
 

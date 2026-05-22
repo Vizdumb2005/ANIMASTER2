@@ -1,5 +1,7 @@
 // Phase 7 — Task Group 1: Provider-agnostic AI interface
 
+import { Result } from '../../types/result.js';
+
 export interface AIProviderConfig {
   apiKey?: string;
   baseUrl?: string;
@@ -28,6 +30,12 @@ export interface AICompletionResponse {
   provider: string;
   tokensUsed?: number;
   latencyMs: number;
+}
+
+export interface AIError {
+  message: string;
+  code?: string;
+  details?: any;
 }
 
 export interface CinematicPlanRequest {
@@ -80,16 +88,16 @@ export interface AIProvider {
   readonly name: string;
   readonly isAvailable: boolean;
 
-  initialize(config: AIProviderConfig): Promise<void>;
-  complete(request: AICompletionRequest): Promise<AICompletionResponse>;
+  initialize(config: AIProviderConfig): Promise<Result<void, AIError>>;
+  complete(request: AICompletionRequest): Promise<Result<AICompletionResponse, AIError>>;
 
-  generateScenePlan(request: CinematicPlanRequest): Promise<AICompletionResponse>;
-  generateMutationPlan(request: MutationPlanRequest): Promise<AICompletionResponse>;
-  generateDialogue(request: DialogueRequest): Promise<AICompletionResponse>;
-  generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<AICompletionResponse>;
-  generateBlockingIntent(request: BlockingIntentRequest): Promise<AICompletionResponse>;
-  generateCameraIntent(request: CameraIntentRequest): Promise<AICompletionResponse>;
-  summarizeSceneMemory(sceneJson: string): Promise<AICompletionResponse>;
+  generateScenePlan(request: CinematicPlanRequest): Promise<Result<AICompletionResponse, AIError>>;
+  generateMutationPlan(request: MutationPlanRequest): Promise<Result<AICompletionResponse, AIError>>;
+  generateDialogue(request: DialogueRequest): Promise<Result<AICompletionResponse, AIError>>;
+  generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<Result<AICompletionResponse, AIError>>;
+  generateBlockingIntent(request: BlockingIntentRequest): Promise<Result<AICompletionResponse, AIError>>;
+  generateCameraIntent(request: CameraIntentRequest): Promise<Result<AICompletionResponse, AIError>>;
+  summarizeSceneMemory(sceneJson: string): Promise<Result<AICompletionResponse, AIError>>;
 }
 
 export type ProviderName = 'groq' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'mock';
