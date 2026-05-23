@@ -14,6 +14,7 @@ export interface CaptureConfig {
   format: 'png' | 'jpeg' | 'webp';
   includeAudio: boolean;
   captureMode: 'realtime' | 'offline';
+  duration: number; // seconds
 }
 
 export interface FrameData {

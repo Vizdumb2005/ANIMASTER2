@@ -21,10 +21,7 @@ export interface SequencedShot extends PlannedShot {
   transitionEndTime?: number;
   emotionalContext: EmotionalContext;
   durationSeconds: number;
-  cameraSpecs: any;
   emotionalWeight: number;
-  transition: any;
-  shotType: any;
   emotionalIntent: string;
 }
 

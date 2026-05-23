@@ -14,6 +14,7 @@ export interface RenderConfig {
   frameRate: number;
   quality: number; // 0-1
   includeAudio: boolean;
+  duration: number; // seconds
   audioTrack?: AudioTrackConfig;
   watermark?: WatermarkConfig;
   metadata?: RenderMetadata;
@@ -50,6 +51,7 @@ export interface RenderProgress {
   status: 'idle' | 'rendering' | 'encoding' | 'complete' | 'error';
   estimatedTimeRemaining: number; // seconds
   currentOperation: string;
+  startTime?: number; // internal: epoch ms when render started
 }
 
 export interface RenderedOutput {
@@ -87,7 +89,8 @@ export class TimelineRenderer {
       progress: 0,
       status: 'rendering',
       estimatedTimeRemaining: this.estimateRenderTime(captureSession, config),
-      currentOperation: 'Initializing render...'
+      currentOperation: 'Initializing render...',
+      startTime: Date.now()
     };
     
     try {
@@ -145,7 +148,8 @@ export class TimelineRenderer {
       progress: 0,
       status: 'rendering',
       estimatedTimeRemaining: config.duration * 2, // Rough estimate
-      currentOperation: 'Starting realtime capture...'
+      currentOperation: 'Starting realtime capture...',
+      startTime: Date.now()
     };
     
     try {
@@ -218,7 +222,7 @@ export class TimelineRenderer {
         // Update progress
         const updateInterval = setInterval(() => {
           if (this.currentRender) {
-            const elapsed = Date.now() - (this.currentRender as any).startTime;
+            const elapsed = Date.now() - (this.currentRender.startTime ?? Date.now());
             this.currentRender.progress = Math.min(elapsed / (config.duration * 1000), 0.99);
             this.currentRender.estimatedTimeRemaining = (config.duration * 1000 - elapsed) / 1000;
           }
@@ -500,7 +504,7 @@ export class TimelineRenderer {
       
       // Update estimated time remaining
       if (currentFrame > 0) {
-        const elapsed = Date.now() - (this.currentRender as any).startTime;
+        const elapsed = Date.now() - (this.currentRender.startTime ?? Date.now());
         const estimatedTotal = elapsed / this.currentRender.progress;
         this.currentRender.estimatedTimeRemaining = (estimatedTotal - elapsed) / 1000;
       }

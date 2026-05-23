@@ -5,9 +5,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "dist",
-    "rootDir": "src",
     "types": ["node"],
-    "noEmit": false,
+    "noEmit": true,
     "baseUrl": "..",
     "paths": {
       "@animaster/shared/*": ["shared/src/*"],
@@ -15,5 +14,5 @@
       "@animaster/server/*": ["server/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../shared/src"]
 }

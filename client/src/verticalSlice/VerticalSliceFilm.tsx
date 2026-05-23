@@ -8,12 +8,24 @@ import { RuntimeShotController } from '../timeline/runtimeShotController';
 import { FrameCaptureSystem } from '../export/frameCapture';
 import { TimelineRenderer } from '../export/timelineRenderer';
 import { VideoAssembler } from '../export/videoAssembler';
+import type { SequencedShot } from '../../../server/src/shots/shotSequencer';
+import type { TransitionPlan } from '../../../server/src/shots/transitionPlanner';
+import type { EmotionalBeat } from '../../../server/src/narrative/narrativeArcGenerator';
+
+
+interface FilmCompletedData {
+  url: string;
+  duration: number;
+  format: string;
+  resolution: string;
+}
 
 interface VerticalSliceFilmProps {
   prompt?: string;
-  onFilmComplete?: (filmData: any) => void;
+  onFilmComplete?: (filmData: FilmCompletedData) => void;
   onProgressUpdate?: (progress: number, stage: string) => void;
 }
+
 
 export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
   prompt = "A lonely man waits at an empty train station at night during rain.",
@@ -36,7 +48,7 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
   const timelineRendererRef = useRef<TimelineRenderer | null>(null);
   const videoAssemblerRef = useRef<VideoAssembler | null>(null);
   
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const lastUpdateTimeRef = useRef<number>(0);
   
   // Initialize systems
@@ -211,8 +223,8 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
     ];
     
     // Initialize systems
-    const timeline = new CinematicTimeline(mockShots as any, mockTransitions as any, mockEmotionalBeats as any);
-    const beatScheduler = new BeatScheduler(mockEmotionalBeats as any, mockShots as any);
+    const timeline = new CinematicTimeline(mockShots as unknown as SequencedShot[], mockTransitions as unknown as TransitionPlan[], mockEmotionalBeats as unknown as EmotionalBeat[]);
+    const beatScheduler = new BeatScheduler(mockEmotionalBeats as unknown as EmotionalBeat[], mockShots as unknown as SequencedShot[]);
     const shotController = new RuntimeShotController(timeline, beatScheduler);
     const frameCapture = new FrameCaptureSystem(timeline, shotController);
     const timelineRenderer = new TimelineRenderer(timeline, shotController);
@@ -379,6 +391,7 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
       frameRate: 30,
       quality: 0.8,
       includeAudio: false,
+      duration: totalDuration,
       metadata: {
         title: 'The Last Train',
         description: 'A lonely man waits at an empty train station at night during rain.',

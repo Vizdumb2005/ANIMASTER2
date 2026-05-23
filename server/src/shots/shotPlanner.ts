@@ -116,7 +116,7 @@ function mapShotType(shotType: string): ShotType {
   return typeMap[shotType] || 'medium';
 }
 
-function getNarrativePurpose(segment: ShotSegment, context: any): string {
+function getNarrativePurpose(segment: ShotSegment, context: { emotion: string; intensity: number; description: string }): string {
   const purposes: Record<string, string> = {
     'establishing': `Establish ${context.emotion} atmosphere in empty station`,
     'wide': `Emphasize character isolation through negative space`,
@@ -129,7 +129,7 @@ function getNarrativePurpose(segment: ShotSegment, context: any): string {
   return purposes[segment.shotType] || `Convey ${context.emotion} through ${segment.shotType} shot`;
 }
 
-function generateCameraSpecs(segment: ShotSegment, context: any): CameraSpecs {
+function generateCameraSpecs(segment: ShotSegment, context: { emotion: string; intensity: number; description: string }): CameraSpecs {
   const specs: CameraSpecs = {
     angle: 'eye_level',
     movement: 'static',
@@ -178,7 +178,7 @@ function generateCameraSpecs(segment: ShotSegment, context: any): CameraSpecs {
   return specs;
 }
 
-function generateFramingSpecs(segment: ShotSegment, context: any): FramingSpecs {
+function generateFramingSpecs(segment: ShotSegment, context: { emotion: string; intensity: number; description: string }): FramingSpecs {
   const specs: FramingSpecs = {
     composition: 'rule_of_thirds',
     focalPriority: ['character'],
