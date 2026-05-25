@@ -1,14 +1,16 @@
 import { Result, ok, err } from './result.js';
-import {
-  SceneGraph,
-  ActorEmotion,
-  ActorAction,
-  CameraMode,
-  SceneTone,
-  AtmosphereEffect,
-  RelationshipType
-} from './scene.js';
+import { SceneGraph } from './scene.js';
 import YAML from 'yaml';
+import {
+  ACTOR_EMOTIONS,
+  ACTOR_ACTIONS,
+  CAMERA_MODES,
+  SCENE_TONES,
+  ATMOSPHERE_EFFECTS,
+  RELATIONSHIP_TYPES,
+  RHYTHM_TEMPOS,
+  MOTION_ENERGY_CURVES,
+} from './specSchema.js';
 
 export interface ParseError {
   path?: string;
@@ -31,14 +33,17 @@ export class SpecParser {
   static parse(yamlStr: string): Result<SceneGraph, ParseError[]> {
     const lineCounter = new YAML.LineCounter();
     const doc = YAML.parseDocument(yamlStr, { lineCounter });
-    
+
     if (doc.errors && doc.errors.length > 0) {
       const parseErrors: ParseError[] = doc.errors.map(e => {
-        const lineCol = (e.pos && e.pos.length > 0) ? lineCounter.linePos(e.pos[0]) : { line: undefined, col: undefined };
+        const lineCol =
+          e.pos && e.pos.length > 0
+            ? lineCounter.linePos(e.pos[0])
+            : { line: undefined, col: undefined };
         return {
           message: e.message,
           line: lineCol.line,
-          column: lineCol.col
+          column: lineCol.col,
         };
       });
       return err(parseErrors);
@@ -46,15 +51,17 @@ export class SpecParser {
 
     const val = doc.toJS();
 
-    function getLineColForPath(path: (string | number)[]): { line?: number; column?: number } {
-      let node = doc.getIn(path, true) as any;
+    function getLineColForPath(
+      path: (string | number)[],
+    ): { line?: number; column?: number } {
+      let node = doc.getIn(path, true) as YAML.Node | undefined;
       const currentPath = [...path];
       while (!node && currentPath.length > 0) {
         currentPath.pop();
-        node = doc.getIn(currentPath, true) as any;
+        node = doc.getIn(currentPath, true) as YAML.Node | undefined;
       }
-      if (node && node.range) {
-        const pos = lineCounter.linePos(node.range[0]);
+      if (node && 'range' in node && node.range) {
+        const pos = lineCounter.linePos((node.range as unknown as number[])[0]);
         return { line: pos.line, column: pos.col };
       }
       return {};
@@ -67,7 +74,7 @@ export class SpecParser {
         path: pathStr,
         message,
         line: lineCol.line,
-        column: lineCol.column
+        column: lineCol.column,
       };
     }
 
@@ -103,14 +110,16 @@ export class SpecParser {
     } else if (!Array.isArray(val.actors)) {
       errors.push(createError(['actors'], "Property 'actors' must be an array"));
     } else {
-      val.actors.forEach((actor: any, idx: number) => {
+      val.actors.forEach((actor: unknown, idx: number) => {
         errors.push(...validateActor(actor, ['actors', idx]));
       });
     }
 
     // environment: Environment
     if (val.environment === undefined) {
-      errors.push(createError(['environment'], "Property 'environment' is required"));
+      errors.push(
+        createError(['environment'], "Property 'environment' is required"),
+      );
     } else {
       errors.push(...validateEnvironment(val.environment, ['environment']));
     }
@@ -124,36 +133,65 @@ export class SpecParser {
 
     // sessionHistory: SessionEntry[]
     if (val.sessionHistory === undefined) {
-      errors.push(createError(['sessionHistory'], "Property 'sessionHistory' is required"));
+      errors.push(
+        createError(
+          ['sessionHistory'],
+          "Property 'sessionHistory' is required",
+        ),
+      );
     } else if (!Array.isArray(val.sessionHistory)) {
-      errors.push(createError(['sessionHistory'], "Property 'sessionHistory' must be an array"));
+      errors.push(
+        createError(
+          ['sessionHistory'],
+          "Property 'sessionHistory' must be an array",
+        ),
+      );
     } else {
-      val.sessionHistory.forEach((entry: any, idx: number) => {
+      val.sessionHistory.forEach((entry: unknown, idx: number) => {
         errors.push(...validateSessionEntry(entry, ['sessionHistory', idx]));
       });
     }
 
     // cinematicGrammar: CinematicGrammar
     if (val.cinematicGrammar === undefined) {
-      errors.push(createError(['cinematicGrammar'], "Property 'cinematicGrammar' is required"));
+      errors.push(
+        createError(
+          ['cinematicGrammar'],
+          "Property 'cinematicGrammar' is required",
+        ),
+      );
     } else {
-      errors.push(...validateCinematicGrammar(val.cinematicGrammar, ['cinematicGrammar']));
+      errors.push(
+        ...validateCinematicGrammar(val.cinematicGrammar, ['cinematicGrammar']),
+      );
     }
 
     // atmosphere: AtmosphereProfile
     if (val.atmosphere === undefined) {
-      errors.push(createError(['atmosphere'], "Property 'atmosphere' is required"));
+      errors.push(
+        createError(['atmosphere'], "Property 'atmosphere' is required"),
+      );
     } else {
       errors.push(...validateAtmosphere(val.atmosphere, ['atmosphere']));
     }
 
     // relationships: CharacterRelationship[]
     if (val.relationships === undefined) {
-      errors.push(createError(['relationships'], "Property 'relationships' is required"));
+      errors.push(
+        createError(
+          ['relationships'],
+          "Property 'relationships' is required",
+        ),
+      );
     } else if (!Array.isArray(val.relationships)) {
-      errors.push(createError(['relationships'], "Property 'relationships' must be an array"));
+      errors.push(
+        createError(
+          ['relationships'],
+          "Property 'relationships' must be an array",
+        ),
+      );
     } else {
-      val.relationships.forEach((rel: any, idx: number) => {
+      val.relationships.forEach((rel: unknown, idx: number) => {
         errors.push(...validateRelationship(rel, ['relationships', idx]));
       });
     }
@@ -171,366 +209,697 @@ export class SpecParser {
 
     return ok(val as SceneGraph);
 
-    // Helpers
-    function validateVector2(v: any, path: (string | number)[]): ParseError[] {
+    // -------------------------------------------------------------------------
+    // Helpers — all enum constants come from specSchema.ts
+    // -------------------------------------------------------------------------
+
+    function validateVector2(
+      v: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof v !== 'object' || v === null) {
         errs.push(createError(path, 'Expected object for Vector2'));
         return errs;
       }
-      if (v.x === undefined) {
+      const obj = v as Record<string, unknown>;
+      if (obj.x === undefined) {
         errs.push(createError([...path, 'x'], "Property 'x' is required"));
-      } else if (typeof v.x !== 'number') {
+      } else if (typeof obj.x !== 'number') {
         errs.push(createError([...path, 'x'], "Property 'x' must be a number"));
       }
-      if (v.y === undefined) {
+      if (obj.y === undefined) {
         errs.push(createError([...path, 'y'], "Property 'y' is required"));
-      } else if (typeof v.y !== 'number') {
+      } else if (typeof obj.y !== 'number') {
         errs.push(createError([...path, 'y'], "Property 'y' must be a number"));
       }
       return errs;
     }
 
-    function validateJoints(joints: any, path: (string | number)[]): ParseError[] {
+    function validateJoints(
+      joints: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof joints !== 'object' || joints === null) {
         errs.push(createError(path, 'Expected object for joints'));
         return errs;
       }
-      const jointKeys = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+      const obj = joints as Record<string, unknown>;
+      const jointKeys = [
+        'head',
+        'torso',
+        'leftArm',
+        'rightArm',
+        'leftLeg',
+        'rightLeg',
+      ] as const;
       jointKeys.forEach(key => {
-        if (joints[key] === undefined) {
-          errs.push(createError([...path, key], `Property '${key}' is required in joints`));
+        if (obj[key] === undefined) {
+          errs.push(
+            createError(
+              [...path, key],
+              `Property '${key}' is required in joints`,
+            ),
+          );
         } else {
-          errs.push(...validateVector2(joints[key], [...path, key]));
+          errs.push(...validateVector2(obj[key], [...path, key]));
         }
       });
       return errs;
     }
 
-    function validateActor(actor: any, path: (string | number)[]): ParseError[] {
+    function validateActor(
+      actor: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof actor !== 'object' || actor === null) {
         errs.push(createError(path, 'Expected object for Actor'));
         return errs;
       }
+      const a = actor as Record<string, unknown>;
 
-      if (actor.id === undefined) {
+      if (a.id === undefined) {
         errs.push(createError([...path, 'id'], "Property 'id' is required"));
-      } else if (typeof actor.id !== 'string') {
-        errs.push(createError([...path, 'id'], "Property 'id' must be a string"));
+      } else if (typeof a.id !== 'string') {
+        errs.push(
+          createError([...path, 'id'], "Property 'id' must be a string"),
+        );
       }
 
-      if (actor.label === undefined) {
-        errs.push(createError([...path, 'label'], "Property 'label' is required"));
-      } else if (typeof actor.label !== 'string') {
-        errs.push(createError([...path, 'label'], "Property 'label' must be a string"));
+      if (a.label === undefined) {
+        errs.push(
+          createError([...path, 'label'], "Property 'label' is required"),
+        );
+      } else if (typeof a.label !== 'string') {
+        errs.push(
+          createError([...path, 'label'], "Property 'label' must be a string"),
+        );
       }
 
-      if (actor.type === undefined) {
-        errs.push(createError([...path, 'type'], "Property 'type' is required"));
-      } else if (actor.type !== 'humanoid') {
-        errs.push(createError([...path, 'type'], "Property 'type' must be 'humanoid'"));
+      if (a.type === undefined) {
+        errs.push(
+          createError([...path, 'type'], "Property 'type' is required"),
+        );
+      } else if (a.type !== 'humanoid') {
+        errs.push(
+          createError([...path, 'type'], "Property 'type' must be 'humanoid'"),
+        );
       }
 
-      if (actor.position === undefined) {
-        errs.push(createError([...path, 'position'], "Property 'position' is required"));
+      if (a.position === undefined) {
+        errs.push(
+          createError(
+            [...path, 'position'],
+            "Property 'position' is required",
+          ),
+        );
       } else {
-        errs.push(...validateVector2(actor.position, [...path, 'position']));
+        errs.push(...validateVector2(a.position, [...path, 'position']));
       }
 
-      if (actor.targetPosition === undefined) {
-        errs.push(createError([...path, 'targetPosition'], "Property 'targetPosition' is required"));
-      } else if (actor.targetPosition !== null) {
-        errs.push(...validateVector2(actor.targetPosition, [...path, 'targetPosition']));
+      if (a.targetPosition === undefined) {
+        errs.push(
+          createError(
+            [...path, 'targetPosition'],
+            "Property 'targetPosition' is required",
+          ),
+        );
+      } else if (a.targetPosition !== null) {
+        errs.push(
+          ...validateVector2(a.targetPosition, [...path, 'targetPosition']),
+        );
       }
 
-      const validEmotions: ActorEmotion[] = ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'];
-      if (actor.emotionState === undefined) {
-        errs.push(createError([...path, 'emotionState'], "Property 'emotionState' is required"));
-      } else if (!validEmotions.includes(actor.emotionState)) {
-        errs.push(createError([...path, 'emotionState'], `Property 'emotionState' must be one of: ${validEmotions.join(', ')}`));
+      // ACTOR_EMOTIONS from specSchema
+      if (a.emotionState === undefined) {
+        errs.push(
+          createError(
+            [...path, 'emotionState'],
+            "Property 'emotionState' is required",
+          ),
+        );
+      } else if (!ACTOR_EMOTIONS.includes(a.emotionState as never)) {
+        errs.push(
+          createError(
+            [...path, 'emotionState'],
+            `Property 'emotionState' must be one of: ${ACTOR_EMOTIONS.join(', ')}`,
+          ),
+        );
       }
 
-      const validActions: ActorAction[] = ['idle', 'walking', 'sitting', 'approaching', 'pacing'];
-      if (actor.currentAction === undefined) {
-        errs.push(createError([...path, 'currentAction'], "Property 'currentAction' is required"));
-      } else if (!validActions.includes(actor.currentAction)) {
-        errs.push(createError([...path, 'currentAction'], `Property 'currentAction' must be one of: ${validActions.join(', ')}`));
+      // ACTOR_ACTIONS from specSchema
+      if (a.currentAction === undefined) {
+        errs.push(
+          createError(
+            [...path, 'currentAction'],
+            "Property 'currentAction' is required",
+          ),
+        );
+      } else if (!ACTOR_ACTIONS.includes(a.currentAction as never)) {
+        errs.push(
+          createError(
+            [...path, 'currentAction'],
+            `Property 'currentAction' must be one of: ${ACTOR_ACTIONS.join(', ')}`,
+          ),
+        );
       }
 
-      if (actor.actionQueue === undefined) {
-        errs.push(createError([...path, 'actionQueue'], "Property 'actionQueue' is required"));
-      } else if (!Array.isArray(actor.actionQueue)) {
-        errs.push(createError([...path, 'actionQueue'], "Property 'actionQueue' must be an array"));
+      if (a.actionQueue === undefined) {
+        errs.push(
+          createError(
+            [...path, 'actionQueue'],
+            "Property 'actionQueue' is required",
+          ),
+        );
+      } else if (!Array.isArray(a.actionQueue)) {
+        errs.push(
+          createError(
+            [...path, 'actionQueue'],
+            "Property 'actionQueue' must be an array",
+          ),
+        );
       } else {
-        actor.actionQueue.forEach((act: any, idx: number) => {
-          if (!validActions.includes(act)) {
-            errs.push(createError([...path, 'actionQueue', idx], `Action must be one of: ${validActions.join(', ')}`));
+        a.actionQueue.forEach((act: unknown, idx: number) => {
+          if (!ACTOR_ACTIONS.includes(act as never)) {
+            errs.push(
+              createError(
+                [...path, 'actionQueue', idx],
+                `Action must be one of: ${ACTOR_ACTIONS.join(', ')}`,
+              ),
+            );
           }
         });
       }
 
-      if (actor.joints === undefined) {
-        errs.push(createError([...path, 'joints'], "Property 'joints' is required"));
+      if (a.joints === undefined) {
+        errs.push(
+          createError([...path, 'joints'], "Property 'joints' is required"),
+        );
       } else {
-        errs.push(...validateJoints(actor.joints, [...path, 'joints']));
+        errs.push(...validateJoints(a.joints, [...path, 'joints']));
       }
 
-      if (actor.actionElapsed === undefined) {
-        errs.push(createError([...path, 'actionElapsed'], "Property 'actionElapsed' is required"));
-      } else if (typeof actor.actionElapsed !== 'number') {
-        errs.push(createError([...path, 'actionElapsed'], "Property 'actionElapsed' must be a number"));
+      if (a.actionElapsed === undefined) {
+        errs.push(
+          createError(
+            [...path, 'actionElapsed'],
+            "Property 'actionElapsed' is required",
+          ),
+        );
+      } else if (typeof a.actionElapsed !== 'number') {
+        errs.push(
+          createError(
+            [...path, 'actionElapsed'],
+            "Property 'actionElapsed' must be a number",
+          ),
+        );
       }
 
       return errs;
     }
 
-    function validateEnvironment(env: any, path: (string | number)[]): ParseError[] {
+    function validateEnvironment(
+      env: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof env !== 'object' || env === null) {
         errs.push(createError(path, 'Expected object for environment'));
         return errs;
       }
+      const e = env as Record<string, unknown>;
       const stringKeys = ['type', 'backgroundColor', 'floorColor', 'wallColor'];
       const numberKeys = ['width', 'height'];
 
       stringKeys.forEach(key => {
-        if (env[key] === undefined) {
-          errs.push(createError([...path, key], `Property '${key}' is required`));
-        } else if (typeof env[key] !== 'string') {
-          errs.push(createError([...path, key], `Property '${key}' must be a string`));
+        if (e[key] === undefined) {
+          errs.push(
+            createError([...path, key], `Property '${key}' is required`),
+          );
+        } else if (typeof e[key] !== 'string') {
+          errs.push(
+            createError([...path, key], `Property '${key}' must be a string`),
+          );
         }
       });
 
       numberKeys.forEach(key => {
-        if (env[key] === undefined) {
-          errs.push(createError([...path, key], `Property '${key}' is required`));
-        } else if (typeof env[key] !== 'number') {
-          errs.push(createError([...path, key], `Property '${key}' must be a number`));
+        if (e[key] === undefined) {
+          errs.push(
+            createError([...path, key], `Property '${key}' is required`),
+          );
+        } else if (typeof e[key] !== 'number') {
+          errs.push(
+            createError([...path, key], `Property '${key}' must be a number`),
+          );
         }
       });
 
       return errs;
     }
 
-    function validateCamera(cam: any, path: (string | number)[]): ParseError[] {
+    function validateCamera(
+      cam: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof cam !== 'object' || cam === null) {
         errs.push(createError(path, 'Expected object for camera'));
         return errs;
       }
+      const c = cam as Record<string, unknown>;
       const numberKeys = ['x', 'y', 'zoom'];
       numberKeys.forEach(key => {
-        if (cam[key] === undefined) {
-          errs.push(createError([...path, key], `Property '${key}' is required`));
-        } else if (typeof cam[key] !== 'number') {
-          errs.push(createError([...path, key], `Property '${key}' must be a number`));
+        if (c[key] === undefined) {
+          errs.push(
+            createError([...path, key], `Property '${key}' is required`),
+          );
+        } else if (typeof c[key] !== 'number') {
+          errs.push(
+            createError([...path, key], `Property '${key}' must be a number`),
+          );
         }
       });
 
-      const validModes: CameraMode[] = ['static', 'follow', 'close_up', 'wide_shot', 'over_the_shoulder', 'dramatic_zoom', 'tension'];
-      if (cam.mode === undefined) {
-        errs.push(createError([...path, 'mode'], "Property 'mode' is required"));
-      } else if (!validModes.includes(cam.mode)) {
-        errs.push(createError([...path, 'mode'], `Property 'mode' must be one of: ${validModes.join(', ')}`));
+      // CAMERA_MODES from specSchema
+      if (c.mode === undefined) {
+        errs.push(
+          createError([...path, 'mode'], "Property 'mode' is required"),
+        );
+      } else if (!CAMERA_MODES.includes(c.mode as never)) {
+        errs.push(
+          createError(
+            [...path, 'mode'],
+            `Property 'mode' must be one of: ${CAMERA_MODES.join(', ')}`,
+          ),
+        );
       }
 
       return errs;
     }
 
-    function validateSessionEntry(entry: any, path: (string | number)[]): ParseError[] {
+    function validateSessionEntry(
+      entry: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof entry !== 'object' || entry === null) {
-        errs.push(createError(path, 'Expected object for sessionHistory entry'));
+        errs.push(
+          createError(path, 'Expected object for sessionHistory entry'),
+        );
         return errs;
       }
-      if (entry.id === undefined) {
+      const en = entry as Record<string, unknown>;
+      if (en.id === undefined) {
         errs.push(createError([...path, 'id'], "Property 'id' is required"));
-      } else if (typeof entry.id !== 'string') {
-        errs.push(createError([...path, 'id'], "Property 'id' must be a string"));
+      } else if (typeof en.id !== 'string') {
+        errs.push(
+          createError([...path, 'id'], "Property 'id' must be a string"),
+        );
       }
 
-      if (entry.prompt === undefined) {
-        errs.push(createError([...path, 'prompt'], "Property 'prompt' is required"));
-      } else if (typeof entry.prompt !== 'string') {
-        errs.push(createError([...path, 'prompt'], "Property 'prompt' must be a string"));
+      if (en.prompt === undefined) {
+        errs.push(
+          createError([...path, 'prompt'], "Property 'prompt' is required"),
+        );
+      } else if (typeof en.prompt !== 'string') {
+        errs.push(
+          createError(
+            [...path, 'prompt'],
+            "Property 'prompt' must be a string",
+          ),
+        );
       }
 
-      if (entry.createdAt === undefined) {
-        errs.push(createError([...path, 'createdAt'], "Property 'createdAt' is required"));
-      } else if (typeof entry.createdAt !== 'number') {
-        errs.push(createError([...path, 'createdAt'], "Property 'createdAt' must be a number"));
+      if (en.createdAt === undefined) {
+        errs.push(
+          createError(
+            [...path, 'createdAt'],
+            "Property 'createdAt' is required",
+          ),
+        );
+      } else if (typeof en.createdAt !== 'number') {
+        errs.push(
+          createError(
+            [...path, 'createdAt'],
+            "Property 'createdAt' must be a number",
+          ),
+        );
       }
 
       return errs;
     }
 
-    function validateCinematicTemplate(tmpl: any, path: (string | number)[]): ParseError[] {
+    function validateCinematicTemplate(
+      tmpl: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof tmpl !== 'object' || tmpl === null) {
         errs.push(createError(path, 'Expected object for template'));
         return errs;
       }
+      const t = tmpl as Record<string, unknown>;
 
-      const validModes: CameraMode[] = ['static', 'follow', 'close_up', 'wide_shot', 'over_the_shoulder', 'dramatic_zoom', 'tension'];
-      if (tmpl.cameraMode === undefined) {
-        errs.push(createError([...path, 'cameraMode'], "Property 'cameraMode' is required"));
-      } else if (!validModes.includes(tmpl.cameraMode)) {
-        errs.push(createError([...path, 'cameraMode'], `Property 'cameraMode' must be one of: ${validModes.join(', ')}`));
+      // CAMERA_MODES from specSchema
+      if (t.cameraMode === undefined) {
+        errs.push(
+          createError(
+            [...path, 'cameraMode'],
+            "Property 'cameraMode' is required",
+          ),
+        );
+      } else if (!CAMERA_MODES.includes(t.cameraMode as never)) {
+        errs.push(
+          createError(
+            [...path, 'cameraMode'],
+            `Property 'cameraMode' must be one of: ${CAMERA_MODES.join(', ')}`,
+          ),
+        );
       }
 
-      const numberKeys = ['spacingMultiplier', 'motionEnergyScale', 'pauseFrequency', 'contrastBoost', 'headroom'];
+      const numberKeys = [
+        'spacingMultiplier',
+        'motionEnergyScale',
+        'pauseFrequency',
+        'contrastBoost',
+        'headroom',
+      ];
       numberKeys.forEach(key => {
-        if (tmpl[key] === undefined) {
-          errs.push(createError([...path, key], `Property '${key}' is required`));
-        } else if (typeof tmpl[key] !== 'number') {
-          errs.push(createError([...path, key], `Property '${key}' must be a number`));
+        if (t[key] === undefined) {
+          errs.push(
+            createError([...path, key], `Property '${key}' is required`),
+          );
+        } else if (typeof t[key] !== 'number') {
+          errs.push(
+            createError([...path, key], `Property '${key}' must be a number`),
+          );
         }
       });
 
       return errs;
     }
 
-    function validateCinematicGrammar(cg: any, path: (string | number)[]): ParseError[] {
+    function validateCinematicGrammar(
+      cg: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof cg !== 'object' || cg === null) {
         errs.push(createError(path, 'Expected object for cinematicGrammar'));
         return errs;
       }
+      const g = cg as Record<string, unknown>;
 
-      const validTones: SceneTone[] = ['neutral', 'sad', 'tense', 'lonely', 'awkward', 'energetic', 'romantic', 'threatening'];
-      if (cg.tone === undefined) {
-        errs.push(createError([...path, 'tone'], "Property 'tone' is required"));
-      } else if (!validTones.includes(cg.tone)) {
-        errs.push(createError([...path, 'tone'], `Property 'tone' must be one of: ${validTones.join(', ')}`));
+      // SCENE_TONES from specSchema
+      if (g.tone === undefined) {
+        errs.push(
+          createError([...path, 'tone'], "Property 'tone' is required"),
+        );
+      } else if (!SCENE_TONES.includes(g.tone as never)) {
+        errs.push(
+          createError(
+            [...path, 'tone'],
+            `Property 'tone' must be one of: ${SCENE_TONES.join(', ')}`,
+          ),
+        );
       }
 
-      if (cg.template === undefined) {
-        errs.push(createError([...path, 'template'], "Property 'template' is required"));
+      if (g.template === undefined) {
+        errs.push(
+          createError([...path, 'template'], "Property 'template' is required"),
+        );
       } else {
-        errs.push(...validateCinematicTemplate(cg.template, [...path, 'template']));
+        errs.push(
+          ...validateCinematicTemplate(g.template, [...path, 'template']),
+        );
       }
 
       return errs;
     }
 
-    function validateAtmosphere(at: any, path: (string | number)[]): ParseError[] {
+    function validateAtmosphere(
+      at: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof at !== 'object' || at === null) {
         errs.push(createError(path, 'Expected object for atmosphere'));
         return errs;
       }
+      const a = at as Record<string, unknown>;
 
-      if (at.effects === undefined) {
-        errs.push(createError([...path, 'effects'], "Property 'effects' is required"));
-      } else if (!Array.isArray(at.effects)) {
-        errs.push(createError([...path, 'effects'], "Property 'effects' must be an array"));
+      if (a.effects === undefined) {
+        errs.push(
+          createError([...path, 'effects'], "Property 'effects' is required"),
+        );
+      } else if (!Array.isArray(a.effects)) {
+        errs.push(
+          createError(
+            [...path, 'effects'],
+            "Property 'effects' must be an array",
+          ),
+        );
       } else {
-        const validEffects: AtmosphereEffect[] = ['rain', 'fog', 'flicker', 'dust', 'snow', 'embers', 'none'];
-        at.effects.forEach((eff: any, idx: number) => {
-          if (!validEffects.includes(eff)) {
-            errs.push(createError([...path, 'effects', idx], `Effect must be one of: ${validEffects.join(', ')}`));
+        // ATMOSPHERE_EFFECTS from specSchema
+        a.effects.forEach((eff: unknown, idx: number) => {
+          if (!ATMOSPHERE_EFFECTS.includes(eff as never)) {
+            errs.push(
+              createError(
+                [...path, 'effects', idx],
+                `Effect must be one of: ${ATMOSPHERE_EFFECTS.join(', ')}`,
+              ),
+            );
           }
         });
       }
 
-      if (at.lightingTint === undefined) {
-        errs.push(createError([...path, 'lightingTint'], "Property 'lightingTint' is required"));
-      } else if (typeof at.lightingTint !== 'string') {
-        errs.push(createError([...path, 'lightingTint'], "Property 'lightingTint' must be a string"));
+      if (a.lightingTint === undefined) {
+        errs.push(
+          createError(
+            [...path, 'lightingTint'],
+            "Property 'lightingTint' is required",
+          ),
+        );
+      } else if (typeof a.lightingTint !== 'string') {
+        errs.push(
+          createError(
+            [...path, 'lightingTint'],
+            "Property 'lightingTint' must be a string",
+          ),
+        );
       }
 
-      if (at.ambientIntensity === undefined) {
-        errs.push(createError([...path, 'ambientIntensity'], "Property 'ambientIntensity' is required"));
-      } else if (typeof at.ambientIntensity !== 'number') {
-        errs.push(createError([...path, 'ambientIntensity'], "Property 'ambientIntensity' must be a number"));
+      if (a.ambientIntensity === undefined) {
+        errs.push(
+          createError(
+            [...path, 'ambientIntensity'],
+            "Property 'ambientIntensity' is required",
+          ),
+        );
+      } else if (typeof a.ambientIntensity !== 'number') {
+        errs.push(
+          createError(
+            [...path, 'ambientIntensity'],
+            "Property 'ambientIntensity' must be a number",
+          ),
+        );
       }
 
       return errs;
     }
 
-    function validateRelationship(rel: any, path: (string | number)[]): ParseError[] {
+    function validateRelationship(
+      rel: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof rel !== 'object' || rel === null) {
         errs.push(createError(path, 'Expected object for relationship'));
         return errs;
       }
+      const r = rel as Record<string, unknown>;
 
-      if (rel.actorAId === undefined) {
-        errs.push(createError([...path, 'actorAId'], "Property 'actorAId' is required"));
-      } else if (typeof rel.actorAId !== 'string') {
-        errs.push(createError([...path, 'actorAId'], "Property 'actorAId' must be a string"));
+      if (r.actorAId === undefined) {
+        errs.push(
+          createError(
+            [...path, 'actorAId'],
+            "Property 'actorAId' is required",
+          ),
+        );
+      } else if (typeof r.actorAId !== 'string') {
+        errs.push(
+          createError(
+            [...path, 'actorAId'],
+            "Property 'actorAId' must be a string",
+          ),
+        );
       }
 
-      if (rel.actorBId === undefined) {
-        errs.push(createError([...path, 'actorBId'], "Property 'actorBId' is required"));
-      } else if (typeof rel.actorBId !== 'string') {
-        errs.push(createError([...path, 'actorBId'], "Property 'actorBId' must be a string"));
+      if (r.actorBId === undefined) {
+        errs.push(
+          createError(
+            [...path, 'actorBId'],
+            "Property 'actorBId' is required",
+          ),
+        );
+      } else if (typeof r.actorBId !== 'string') {
+        errs.push(
+          createError(
+            [...path, 'actorBId'],
+            "Property 'actorBId' must be a string",
+          ),
+        );
       }
 
-      const validTypes: RelationshipType[] = ['stranger', 'approaching', 'confronting', 'avoiding', 'conversing'];
-      if (rel.type === undefined) {
-        errs.push(createError([...path, 'type'], "Property 'type' is required"));
-      } else if (!validTypes.includes(rel.type)) {
-        errs.push(createError([...path, 'type'], `Property 'type' must be one of: ${validTypes.join(', ')}`));
+      // RELATIONSHIP_TYPES from specSchema
+      if (r.type === undefined) {
+        errs.push(
+          createError([...path, 'type'], "Property 'type' is required"),
+        );
+      } else if (!RELATIONSHIP_TYPES.includes(r.type as never)) {
+        errs.push(
+          createError(
+            [...path, 'type'],
+            `Property 'type' must be one of: ${RELATIONSHIP_TYPES.join(', ')}`,
+          ),
+        );
       }
 
-      if (rel.awarenessRadius === undefined) {
-        errs.push(createError([...path, 'awarenessRadius'], "Property 'awarenessRadius' is required"));
-      } else if (typeof rel.awarenessRadius !== 'number') {
-        errs.push(createError([...path, 'awarenessRadius'], "Property 'awarenessRadius' must be a number"));
+      if (r.awarenessRadius === undefined) {
+        errs.push(
+          createError(
+            [...path, 'awarenessRadius'],
+            "Property 'awarenessRadius' is required",
+          ),
+        );
+      } else if (typeof r.awarenessRadius !== 'number') {
+        errs.push(
+          createError(
+            [...path, 'awarenessRadius'],
+            "Property 'awarenessRadius' must be a number",
+          ),
+        );
       }
 
-      if (rel.gazeTarget === undefined) {
-        errs.push(createError([...path, 'gazeTarget'], "Property 'gazeTarget' is required"));
-      } else if (rel.gazeTarget !== null && typeof rel.gazeTarget !== 'string') {
-        errs.push(createError([...path, 'gazeTarget'], "Property 'gazeTarget' must be string or null"));
+      if (r.gazeTarget === undefined) {
+        errs.push(
+          createError(
+            [...path, 'gazeTarget'],
+            "Property 'gazeTarget' is required",
+          ),
+        );
+      } else if (r.gazeTarget !== null && typeof r.gazeTarget !== 'string') {
+        errs.push(
+          createError(
+            [...path, 'gazeTarget'],
+            "Property 'gazeTarget' must be string or null",
+          ),
+        );
       }
 
-      const validEmotions: ActorEmotion[] = ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'];
-      if (rel.emotionalReaction === undefined) {
-        errs.push(createError([...path, 'emotionalReaction'], "Property 'emotionalReaction' is required"));
-      } else if (rel.emotionalReaction !== null && !validEmotions.includes(rel.emotionalReaction)) {
-        errs.push(createError([...path, 'emotionalReaction'], `Property 'emotionalReaction' must be null or one of: ${validEmotions.join(', ')}`));
+      // ACTOR_EMOTIONS from specSchema (nullable)
+      if (r.emotionalReaction === undefined) {
+        errs.push(
+          createError(
+            [...path, 'emotionalReaction'],
+            "Property 'emotionalReaction' is required",
+          ),
+        );
+      } else if (
+        r.emotionalReaction !== null &&
+        !ACTOR_EMOTIONS.includes(r.emotionalReaction as never)
+      ) {
+        errs.push(
+          createError(
+            [...path, 'emotionalReaction'],
+            `Property 'emotionalReaction' must be null or one of: ${ACTOR_EMOTIONS.join(', ')}`,
+          ),
+        );
       }
 
-      if (rel.preferredDistance !== undefined && typeof rel.preferredDistance !== 'number') {
-        errs.push(createError([...path, 'preferredDistance'], "Property 'preferredDistance' must be a number"));
+      if (
+        r.preferredDistance !== undefined &&
+        typeof r.preferredDistance !== 'number'
+      ) {
+        errs.push(
+          createError(
+            [...path, 'preferredDistance'],
+            "Property 'preferredDistance' must be a number",
+          ),
+        );
       }
 
-      if (rel.tension !== undefined && typeof rel.tension !== 'number') {
-        errs.push(createError([...path, 'tension'], "Property 'tension' must be a number"));
+      if (r.tension !== undefined && typeof r.tension !== 'number') {
+        errs.push(
+          createError(
+            [...path, 'tension'],
+            "Property 'tension' must be a number",
+          ),
+        );
       }
 
       return errs;
     }
 
-    function validateRhythm(rhythm: any, path: (string | number)[]): ParseError[] {
+    function validateRhythm(
+      rhythm: unknown,
+      path: (string | number)[],
+    ): ParseError[] {
       const errs: ParseError[] = [];
       if (typeof rhythm !== 'object' || rhythm === null) {
         errs.push(createError(path, 'Expected object for rhythm'));
         return errs;
       }
+      const r = rhythm as Record<string, unknown>;
 
-      const validTempos = ['slow', 'medium', 'fast'];
-      if (rhythm.tempo === undefined) {
-        errs.push(createError([...path, 'tempo'], "Property 'tempo' is required"));
-      } else if (!validTempos.includes(rhythm.tempo)) {
-        errs.push(createError([...path, 'tempo'], `Property 'tempo' must be one of: ${validTempos.join(', ')}`));
+      // RHYTHM_TEMPOS from specSchema
+      if (r.tempo === undefined) {
+        errs.push(
+          createError([...path, 'tempo'], "Property 'tempo' is required"),
+        );
+      } else if (!RHYTHM_TEMPOS.includes(r.tempo as never)) {
+        errs.push(
+          createError(
+            [...path, 'tempo'],
+            `Property 'tempo' must be one of: ${RHYTHM_TEMPOS.join(', ')}`,
+          ),
+        );
       }
 
-      if (rhythm.pauseFrequencyPerMinute === undefined) {
-        errs.push(createError([...path, 'pauseFrequencyPerMinute'], "Property 'pauseFrequencyPerMinute' is required"));
-      } else if (typeof rhythm.pauseFrequencyPerMinute !== 'number') {
-        errs.push(createError([...path, 'pauseFrequencyPerMinute'], "Property 'pauseFrequencyPerMinute' must be a number"));
+      if (r.pauseFrequencyPerMinute === undefined) {
+        errs.push(
+          createError(
+            [...path, 'pauseFrequencyPerMinute'],
+            "Property 'pauseFrequencyPerMinute' is required",
+          ),
+        );
+      } else if (typeof r.pauseFrequencyPerMinute !== 'number') {
+        errs.push(
+          createError(
+            [...path, 'pauseFrequencyPerMinute'],
+            "Property 'pauseFrequencyPerMinute' must be a number",
+          ),
+        );
       }
 
-      const validCurves = ['linear', 'ease-in', 'ease-out', 'sharp'];
-      if (rhythm.motionEnergyCurve === undefined) {
-        errs.push(createError([...path, 'motionEnergyCurve'], "Property 'motionEnergyCurve' is required"));
-      } else if (!validCurves.includes(rhythm.motionEnergyCurve)) {
-        errs.push(createError([...path, 'motionEnergyCurve'], `Property 'motionEnergyCurve' must be one of: ${validCurves.join(', ')}`));
+      // MOTION_ENERGY_CURVES from specSchema
+      if (r.motionEnergyCurve === undefined) {
+        errs.push(
+          createError(
+            [...path, 'motionEnergyCurve'],
+            "Property 'motionEnergyCurve' is required",
+          ),
+        );
+      } else if (!MOTION_ENERGY_CURVES.includes(r.motionEnergyCurve as never)) {
+        errs.push(
+          createError(
+            [...path, 'motionEnergyCurve'],
+            `Property 'motionEnergyCurve' must be one of: ${MOTION_ENERGY_CURVES.join(', ')}`,
+          ),
+        );
       }
 
       return errs;
