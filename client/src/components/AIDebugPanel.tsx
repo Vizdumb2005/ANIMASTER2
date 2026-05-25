@@ -33,40 +33,37 @@ export default function AIDebugPanel() {
     if (!promptInput.trim()) return;
     setLoading(true);
     setError(null);
-    try {
-      const result = await debugIntent(promptInput.trim());
-      setIntentDebug(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Debug failed');
-    } finally {
-      setLoading(false);
+    const result = await debugIntent(promptInput.trim());
+    if (!result.ok) {
+      setError(result.error.message);
+    } else {
+      setIntentDebug(result.value);
     }
+    setLoading(false);
   }
 
   async function handleLoadStatus() {
     setLoading(true);
     setError(null);
-    try {
-      const status = await fetchAIStatus();
-      setAIStatus(status);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Status fetch failed');
-    } finally {
-      setLoading(false);
+    const result = await fetchAIStatus();
+    if (!result.ok) {
+      setError(result.error.message);
+    } else {
+      setAIStatus(result.value);
     }
+    setLoading(false);
   }
 
   async function handleLoadMemory() {
     setLoading(true);
     setError(null);
-    try {
-      const mem = await fetchMemory();
-      setMemory(mem);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Memory fetch failed');
-    } finally {
-      setLoading(false);
+    const result = await fetchMemory();
+    if (!result.ok) {
+      setError(result.error.message);
+    } else {
+      setMemory(result.value);
     }
+    setLoading(false);
   }
 
   if (!visible) return null;
