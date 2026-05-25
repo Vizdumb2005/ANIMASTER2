@@ -3,6 +3,7 @@
 // Example: "increase emotional distance" → spacing, framing, gaze avoidance, composition
 
 import type { CinematicIntent } from '../compiler/intentCompiler.js';
+import type { SceneGraph } from '../../../../shared/src/scene.js';
 
 export interface SemanticGraphOperation {
   type: string;
@@ -215,4 +216,174 @@ function summarizeOperations(ops: SemanticGraphOperation[]): string {
   if (ops.length === 0) return 'no semantic modifications';
   const types = [...new Set(ops.map(o => o.type))];
   return types.join(' + ');
+}
+
+export type ResolutionFailureReason =
+  | 'NO_MATCH'
+  | 'AMBIGUOUS'
+  | 'EMPTY_SCENE'
+  | 'INVALID_CRITERIA';
+
+export interface ResolutionFailure {
+  reason: ResolutionFailureReason;
+  message: string;
+}
+
+export type ActorIDResolutionResult =
+  | { ok: true; actorId: string }
+  | { ok: false; error: ResolutionFailure };
+
+const VALID_EMOTIONS = ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'];
+
+/**
+ * Resolves a natural language description to exactly one Actor ID in the current SceneGraph.
+ */
+export function resolveActorReference(
+  description: string,
+  sceneGraph: SceneGraph
+): ActorIDResolutionResult {
+  if (!sceneGraph || !sceneGraph.actors || sceneGraph.actors.length === 0) {
+    return {
+      ok: false,
+      error: {
+        reason: 'EMPTY_SCENE',
+        message: 'The scene graph has no actors'
+      }
+    };
+  }
+
+  if (!description || !description.trim()) {
+    return {
+      ok: false,
+      error: {
+        reason: 'INVALID_CRITERIA',
+        message: 'The description is empty or invalid'
+      }
+    };
+  }
+
+  const descLower = description.toLowerCase().trim();
+  let candidateActors = [...sceneGraph.actors];
+
+  // 1. Check for exact match on ID or Label
+  const directMatch = sceneGraph.actors.find(
+    actor =>
+      actor.id.toLowerCase() === descLower ||
+      actor.label.toLowerCase() === descLower
+  );
+  if (directMatch) {
+    return { ok: true, actorId: directMatch.id };
+  }
+
+  // 2. Filter by emotion if present in description
+  const matchedEmotions = VALID_EMOTIONS.filter(emotion => descLower.includes(emotion));
+  if (matchedEmotions.length > 0) {
+    candidateActors = candidateActors.filter(actor => matchedEmotions.includes(actor.emotionState));
+  }
+
+  // 3. Apply spatial logic
+  if (descLower.includes('left') || descLower.includes('leftmost')) {
+    if (candidateActors.length > 1) {
+      candidateActors.sort((a, b) => a.position.x - b.position.x);
+      if (candidateActors[0].position.x === candidateActors[1].position.x) {
+        return {
+          ok: false,
+          error: {
+            reason: 'AMBIGUOUS',
+            message: `Multiple characters are at the leftmost position for description "${description}"`
+          }
+        };
+      }
+    }
+    if (candidateActors.length > 0) {
+      return { ok: true, actorId: candidateActors[0].id };
+    }
+  }
+
+  if (descLower.includes('right') || descLower.includes('rightmost')) {
+    if (candidateActors.length > 1) {
+      candidateActors.sort((a, b) => b.position.x - a.position.x);
+      if (candidateActors[0].position.x === candidateActors[1].position.x) {
+        return {
+          ok: false,
+          error: {
+            reason: 'AMBIGUOUS',
+            message: `Multiple characters are at the rightmost position for description "${description}"`
+          }
+        };
+      }
+    }
+    if (candidateActors.length > 0) {
+      return { ok: true, actorId: candidateActors[0].id };
+    }
+  }
+
+  if (descLower.includes('middle') || descLower.includes('center')) {
+    if (candidateActors.length > 1) {
+      candidateActors.sort((a, b) => a.position.x - b.position.x);
+      if (candidateActors.length % 2 === 0) {
+        return {
+          ok: false,
+          error: {
+            reason: 'AMBIGUOUS',
+            message: `Staging is even-numbered, middle is ambiguous for description "${description}"`
+          }
+        };
+      }
+      const midIdx = Math.floor(candidateActors.length / 2);
+      return { ok: true, actorId: candidateActors[midIdx].id };
+    }
+    if (candidateActors.length > 0) {
+      return { ok: true, actorId: candidateActors[0].id };
+    }
+  }
+
+  // If we applied emotion filtering and have candidates:
+  if (matchedEmotions.length > 0) {
+    if (candidateActors.length === 1) {
+      return { ok: true, actorId: candidateActors[0].id };
+    }
+    if (candidateActors.length > 1) {
+      return {
+        ok: false,
+        error: {
+          reason: 'AMBIGUOUS',
+          message: `Multiple characters match the emotion criteria in description "${description}"`
+        }
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        reason: 'NO_MATCH',
+        message: `No characters match the emotion criteria in description "${description}"`
+      }
+    };
+  }
+
+  // 4. Fallback: partial match on ID or Label
+  const partialMatches = sceneGraph.actors.filter(
+    actor =>
+      descLower.includes(actor.id.toLowerCase()) ||
+      descLower.includes(actor.label.toLowerCase())
+  );
+  if (partialMatches.length === 1) {
+    return { ok: true, actorId: partialMatches[0].id };
+  } else if (partialMatches.length > 1) {
+    return {
+      ok: false,
+      error: {
+        reason: 'AMBIGUOUS',
+        message: `Multiple characters partially match the name/ID in description "${description}"`
+      }
+    };
+  }
+
+  return {
+    ok: false,
+    error: {
+      reason: 'NO_MATCH',
+      message: `Could not resolve actor reference for description: "${description}"`
+    }
+  };
 }
