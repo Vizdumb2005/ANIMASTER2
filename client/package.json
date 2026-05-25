@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --run --coverage",
-    "test:debug": "vitest --run --inspect-brk"
+    "test:debug": "vitest --run --inspect-brk",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@pixiv/three-vrm": "^3.5.3",
