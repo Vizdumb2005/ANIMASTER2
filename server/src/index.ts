@@ -8,11 +8,18 @@ import mutateRouter from './routes/mutate.js';
 import liveMutateRouter from './routes/liveMutate.js';
 import aiRouter from './routes/ai.js';
 import { providerRegistry } from './ai/providers/providerRegistry.js';
+import { sceneMemory } from './memory/sceneMemory.js';
+import { cinematicMemory } from './memory/cinematicMemory.js';
 
 dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
+
+// WebSocket server for real-time updates (declared early for use in /health/deep)
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+const clients = new Set<WebSocket>();
 
 app.use(cors());
 app.use(express.json());
@@ -26,14 +33,44 @@ app.use('/mutate', mutateRouter);
 app.use('/live-mutate', liveMutateRouter);
 app.use('/ai', aiRouter);
 
+app.get('/health/deep', (_request, response) => {
+  const providersStatus = providerRegistry.getStatus();
+  const availableProviders = providerRegistry.getAvailableProviders();
+  const aiProviders = {} as Record<string, { available: boolean; model?: string }>;
+  for (const name of Object.keys(providersStatus)) {
+    const provider = providerRegistry.getProvider(name as any);
+    aiProviders[name] = {
+      available: availableProviders.includes(name as any),
+      model: (provider as any)?.model || undefined
+    };
+  }
+
+  const websocketStatus = {
+    running: wss !== undefined,
+    connectedClients: clients.size
+  };
+
+  const memoryStore = {
+    sceneMemoryEntries: sceneMemory.getEntries().length,
+    cinematicMemory: {
+      emotionalMotifs: cinematicMemory.getState().emotionalMotifs.length,
+      visualMotifs: cinematicMemory.getState().visualMotifs.length,
+      relationshipEvolutions: cinematicMemory.getState().relationshipEvolutions.length
+    }
+  };
+
+  response.json({
+    status: 'ok',
+    timestamp: Date.now(),
+    aiProviders,
+    websocket: websocketStatus,
+    memory: memoryStore
+  });
+});
+
 app.use((_request, response) => {
   response.status(404).json({ error: 'Not found' });
 });
-
-// WebSocket server for real-time updates
-const server = createServer(app);
-const wss = new WebSocketServer({ server });
-const clients = new Set<WebSocket>();
 
 wss.on('connection', (ws) => {
   clients.add(ws);

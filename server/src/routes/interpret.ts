@@ -139,50 +139,94 @@ router.post('/', async (request, response) => {
   }
 });
 
-async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<SceneGraphResponse> {
-  const orchestration = await orchestrator.orchestrateSceneGeneration(prompt);
-  const context = buildGenerationContext(directing, orchestration);
-  const provider = resolveProvider(orchestration.providerUsed);
+export async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<SceneGraphResponse> {
+  const truncatedPrompt = typeof prompt === 'string' ? prompt.trim().substring(0, 2000) : '';
 
-  if (!provider || provider.name === 'mock') {
-    const fallback = createFallbackScene(prompt);
-    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
+  try {
+    let orchestration;
+    try {
+      orchestration = await orchestrator.orchestrateSceneGeneration(truncatedPrompt);
+    } catch (err) {
+      console.error('Orchestration failed, using fallback:', err);
+      orchestration = {
+        scenePlan: {},
+        agentReports: {
+          cinematography: { cameraMode: 'static', framing: 'medium', transition: 'cut', reasoning: 'fallback' },
+          environment: { locationType: 'indoor_room', compositionBias: 'balanced', reasoning: 'fallback' },
+          emotionalArc: { pacing: 'medium', intensityCurve: 'flat', reasoning: 'fallback' },
+          blocking: { style: 'static', spacing: 200, reasoning: 'fallback' },
+          dialogue: { energy: 0.5, speed: 'normal', reasoning: 'fallback' },
+          lighting: { lightingLanguage: 'natural', keyColor: '#ffffff', ambientIntensity: 0.5, reasoning: 'fallback' }
+        },
+        intent: { emotionalPressure: 0.5, tensionLevel: 0.5, threatLevel: 0.5, intimacyLevel: 0.5, compositionStyle: 'balanced', lightingLanguage: 'natural', pacingStyle: 'measured', cameraAggression: 0.5, dialogueEnergy: 0.5, visualIsolation: 0.5, pacingStyleDurationMultiplier: 1.0 },
+        context: null,
+        providerUsed: 'fallback',
+        fallbackUsed: true,
+        reasoning: ['orchestration threw exception']
+      };
+    }
+
+    const context = buildGenerationContext(directing, orchestration as any);
+    const provider = resolveProvider(orchestration.providerUsed);
+
+    if (!provider || provider.name === 'mock') {
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return applyDirectorIntentToScene(fallback, directing?.directorIntent);
+    }
+
+    let completionResult;
+    try {
+      completionResult = await provider.complete({
+        messages: [
+          { role: 'system', content: sceneGenerationSystemPrompt },
+          { role: 'user', content: buildSceneGenerationUserPrompt(truncatedPrompt, context) }
+        ],
+        temperature: 0.2,
+        maxTokens: 2000,
+        responseFormat: 'json',
+        jsonSchema: sceneGenerationResponseSchema
+      });
+    } catch (err) {
+      console.error('LLM complete call threw exception, falling back:', err);
+      completionResult = { ok: false, error: err instanceof Error ? err : new Error(String(err)) } as any;
+    }
+
+    if (isErr(completionResult)) {
+      console.error('Scene generation failed, using fallback', completionResult.error);
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return fallback;
+    }
+
+    const completion = completionResult.value;
+    if (!completion.content || !completion.content.trim()) {
+      console.error('Provider response was empty');
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return fallback;
+    }
+
+    let parsed: SceneGraphResponse;
+    try {
+      parsed = JSON.parse(completion.content) as SceneGraphResponse;
+    } catch (parseErr) {
+      console.error('JSON parse of completion content failed, using fallback:', parseErr);
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return fallback;
+    }
+
+    const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
+    const worldPlan = resolveWorldPlan(truncatedPrompt, actorCount, orchestration.scenePlan);
+    const normalized = normalizeSceneGraph(parsed, truncatedPrompt, worldPlan);
+    return applyDirectorIntentToScene(normalized, directing?.directorIntent);
+  } catch (globalError) {
+    console.error('Fatal error in interpretPrompt, returning fallback scene:', globalError);
+    const fallback = createFallbackScene(truncatedPrompt);
+    fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, {});
     return applyDirectorIntentToScene(fallback, directing?.directorIntent);
   }
-
-  let parsed: SceneGraphResponse;
-  const completionResult = await provider.complete({
-    messages: [
-      { role: 'system', content: sceneGenerationSystemPrompt },
-      { role: 'user', content: buildSceneGenerationUserPrompt(prompt, context) }
-    ],
-    temperature: 0.2,
-    maxTokens: 2000,
-    responseFormat: 'json',
-    jsonSchema: sceneGenerationResponseSchema
-  });
-
-  if (isErr(completionResult)) {
-    console.error('Scene generation failed, using fallback', completionResult.error);
-    const fallback = createFallbackScene(prompt);
-    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
-    return fallback;
-  }
-
-  const completion = completionResult.value;
-  if (!completion.content || !completion.content.trim()) {
-    console.error('Provider response was empty');
-    const fallback = createFallbackScene(prompt);
-    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
-    return fallback;
-  }
-
-  parsed = JSON.parse(completion.content) as SceneGraphResponse;
-
-  const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
-  const worldPlan = resolveWorldPlan(prompt, actorCount, orchestration.scenePlan);
-  const normalized = normalizeSceneGraph(parsed, prompt, worldPlan);
-  return applyDirectorIntentToScene(normalized, directing?.directorIntent);
 }
 
 type SceneOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateSceneGeneration>>;
@@ -457,6 +501,149 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
   };
 }
 
+const VALID_EMOTIONS = ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'];
+const VALID_ACTIONS = ['idle', 'walking', 'sitting', 'approaching', 'pacing'];
+
+function sanitizeActor(a: any, index: number): SceneGraphResponse['actors'][number] {
+  if (typeof a !== 'object' || a === null) {
+    return {
+      id: `actor_${index + 1}`,
+      label: `Actor ${index + 1}`,
+      type: 'humanoid',
+      position: { x: 400, y: 360 },
+      targetPosition: null,
+      emotionState: 'neutral',
+      currentAction: 'idle',
+      actionQueue: ['idle'],
+      joints: {
+        head: { x: 400, y: 302 },
+        torso: { x: 400, y: 330 },
+        leftArm: { x: 372, y: 350 },
+        rightArm: { x: 428, y: 350 },
+        leftLeg: { x: 382, y: 402 },
+        rightLeg: { x: 418, y: 402 }
+      },
+      actionElapsed: 0
+    };
+  }
+
+  const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : `actor_${index + 1}`;
+  const label = typeof a.label === 'string' && a.label.trim() ? a.label.trim() : id;
+  const position = (a.position && typeof a.position.x === 'number' && typeof a.position.y === 'number')
+    ? { x: a.position.x, y: a.position.y }
+    : { x: 400, y: 360 };
+  const targetPosition = (a.targetPosition && typeof a.targetPosition.x === 'number' && typeof a.targetPosition.y === 'number')
+    ? { x: a.targetPosition.x, y: a.targetPosition.y }
+    : null;
+  const emotionState = VALID_EMOTIONS.includes(a.emotionState) ? a.emotionState : 'neutral';
+  const currentAction = VALID_ACTIONS.includes(a.currentAction) ? a.currentAction : 'idle';
+  const actionQueue = Array.isArray(a.actionQueue)
+    ? a.actionQueue.filter((act: any) => VALID_ACTIONS.includes(act))
+    : ['idle'];
+  if (actionQueue.length === 0) {
+    actionQueue.push('idle');
+  }
+
+  const joints = (a.joints &&
+    a.joints.head && typeof a.joints.head.x === 'number' && typeof a.joints.head.y === 'number' &&
+    a.joints.torso && typeof a.joints.torso.x === 'number' && typeof a.joints.torso.y === 'number' &&
+    a.joints.leftArm && typeof a.joints.leftArm.x === 'number' && typeof a.joints.leftArm.y === 'number' &&
+    a.joints.rightArm && typeof a.joints.rightArm.x === 'number' && typeof a.joints.rightArm.y === 'number' &&
+    a.joints.leftLeg && typeof a.joints.leftLeg.x === 'number' && typeof a.joints.leftLeg.y === 'number' &&
+    a.joints.rightLeg && typeof a.joints.rightLeg.x === 'number' && typeof a.joints.rightLeg.y === 'number')
+    ? {
+        head: { x: a.joints.head.x, y: a.joints.head.y },
+        torso: { x: a.joints.torso.x, y: a.joints.torso.y },
+        leftArm: { x: a.joints.leftArm.x, y: a.joints.leftArm.y },
+        rightArm: { x: a.joints.rightArm.x, y: a.joints.rightArm.y },
+        leftLeg: { x: a.joints.leftLeg.x, y: a.joints.leftLeg.y },
+        rightLeg: { x: a.joints.rightLeg.x, y: a.joints.rightLeg.y }
+      }
+    : {
+        head: { x: position.x, y: position.y - 58 },
+        torso: { x: position.x, y: position.y - 30 },
+        leftArm: { x: position.x - 28, y: position.y - 10 },
+        rightArm: { x: position.x + 28, y: position.y - 10 },
+        leftLeg: { x: position.x - 18, y: position.y + 42 },
+        rightLeg: { x: position.x + 18, y: position.y + 42 }
+      };
+
+  const actionElapsed = typeof a.actionElapsed === 'number' && a.actionElapsed >= 0 ? a.actionElapsed : 0;
+
+  return {
+    id,
+    label,
+    type: 'humanoid',
+    position,
+    targetPosition,
+    emotionState: emotionState as any,
+    currentAction: currentAction as any,
+    actionQueue: actionQueue as any,
+    joints,
+    actionElapsed
+  };
+}
+
+function sanitizeEnvironment(env: any, fallbackEnv: SceneGraphResponse['environment']): SceneGraphResponse['environment'] {
+  if (typeof env !== 'object' || env === null) return fallbackEnv;
+  return {
+    type: typeof env.type === 'string' && env.type.trim() ? env.type.trim() : fallbackEnv.type,
+    backgroundColor: typeof env.backgroundColor === 'string' && env.backgroundColor.trim() ? env.backgroundColor.trim() : fallbackEnv.backgroundColor,
+    floorColor: typeof env.floorColor === 'string' && env.floorColor.trim() ? env.floorColor.trim() : fallbackEnv.floorColor,
+    wallColor: typeof env.wallColor === 'string' && env.wallColor.trim() ? env.wallColor.trim() : fallbackEnv.wallColor,
+    width: typeof env.width === 'number' && env.width >= 1 ? env.width : fallbackEnv.width,
+    height: typeof env.height === 'number' && env.height >= 1 ? env.height : fallbackEnv.height,
+  };
+}
+
+function sanitizeCamera(cam: any, fallbackCam: SceneGraphResponse['camera']): SceneGraphResponse['camera'] {
+  if (typeof cam !== 'object' || cam === null) return fallbackCam;
+  return {
+    x: typeof cam.x === 'number' ? cam.x : fallbackCam.x,
+    y: typeof cam.y === 'number' ? cam.y : fallbackCam.y,
+    zoom: typeof cam.zoom === 'number' && cam.zoom >= 0 ? cam.zoom : fallbackCam.zoom,
+    mode: typeof cam.mode === 'string' && cam.mode.trim() ? cam.mode.trim() : fallbackCam.mode,
+  };
+}
+
+function sanitizeAtmosphere(atmo: any, fallbackAtmo: SceneGraphResponse['atmosphere']): SceneGraphResponse['atmosphere'] {
+  if (typeof atmo !== 'object' || atmo === null) return fallbackAtmo;
+  const effects = Array.isArray(atmo.effects) && atmo.effects.length > 0
+    ? atmo.effects.map((e: any) => typeof e === 'string' ? e.trim() : '').filter(Boolean)
+    : fallbackAtmo.effects;
+  return {
+    effects: effects.length > 0 ? effects : fallbackAtmo.effects,
+    lightingTint: typeof atmo.lightingTint === 'string' && atmo.lightingTint.trim() ? atmo.lightingTint.trim() : fallbackAtmo.lightingTint,
+    ambientIntensity: typeof atmo.ambientIntensity === 'number' && atmo.ambientIntensity >= 0 && atmo.ambientIntensity <= 1 ? atmo.ambientIntensity : fallbackAtmo.ambientIntensity,
+  };
+}
+
+function sanitizeCinematicGrammar(cg: any, fallbackCg: SceneGraphResponse['cinematicGrammar']): SceneGraphResponse['cinematicGrammar'] {
+  if (typeof cg !== 'object' || cg === null) return fallbackCg;
+  const tone = typeof cg.tone === 'string' && cg.tone.trim() ? cg.tone.trim() : fallbackCg.tone;
+  const template = (typeof cg.template === 'object' && cg.template !== null) ? cg.template : fallbackCg.template;
+  return {
+    tone,
+    template: {
+      cameraMode: typeof template.cameraMode === 'string' && template.cameraMode.trim() ? template.cameraMode.trim() : fallbackCg.template.cameraMode,
+      spacingMultiplier: typeof template.spacingMultiplier === 'number' ? template.spacingMultiplier : fallbackCg.template.spacingMultiplier,
+      motionEnergyScale: typeof template.motionEnergyScale === 'number' ? template.motionEnergyScale : fallbackCg.template.motionEnergyScale,
+      pauseFrequency: typeof template.pauseFrequency === 'number' && template.pauseFrequency >= 0 ? template.pauseFrequency : fallbackCg.template.pauseFrequency,
+      contrastBoost: typeof template.contrastBoost === 'number' ? template.contrastBoost : fallbackCg.template.contrastBoost,
+      headroom: typeof template.headroom === 'number' ? template.headroom : fallbackCg.template.headroom,
+    }
+  };
+}
+
+function sanitizeRhythm(rhythm: any, fallbackRhythm: SceneGraphResponse['rhythm']): SceneGraphResponse['rhythm'] {
+  if (typeof rhythm !== 'object' || rhythm === null) return fallbackRhythm;
+  return {
+    tempo: typeof rhythm.tempo === 'string' && rhythm.tempo.trim() ? rhythm.tempo.trim() : fallbackRhythm.tempo,
+    pauseFrequencyPerMinute: typeof rhythm.pauseFrequencyPerMinute === 'number' && rhythm.pauseFrequencyPerMinute >= 0 ? rhythm.pauseFrequencyPerMinute : fallbackRhythm.pauseFrequencyPerMinute,
+    motionEnergyCurve: typeof rhythm.motionEnergyCurve === 'string' && rhythm.motionEnergyCurve.trim() ? rhythm.motionEnergyCurve.trim() : fallbackRhythm.motionEnergyCurve,
+  };
+}
+
 function normalizeSceneGraph(
   scene: SceneGraphResponse & { shotSequence?: SequencedShot[]; narrativeState?: NarrativeState },
   prompt: string,
@@ -468,17 +655,20 @@ function normalizeSceneGraph(
     ? { shotSequence: scene.shotSequence, narrativeState: scene.narrativeState }
     : generateShotSequence(prompt, (scene.actors || fallback.actors) as any);
 
+  const inputActors = Array.isArray(scene.actors) && scene.actors.length > 0 ? scene.actors : fallback.actors;
+  const sanitizedActors = inputActors.map((actor, idx) => sanitizeActor(actor, idx));
+
   return {
     id: typeof scene.id === 'string' ? scene.id : fallback.id,
     version: typeof scene.version === 'number' ? scene.version : fallback.version,
-    actors: Array.isArray(scene.actors) && scene.actors.length > 0 ? scene.actors : fallback.actors,
-    environment: scene.environment ?? fallback.environment,
-    camera: scene.camera ?? fallback.camera,
+    actors: sanitizedActors,
+    environment: sanitizeEnvironment(scene.environment, fallback.environment),
+    camera: sanitizeCamera(scene.camera, fallback.camera),
     sessionHistory: Array.isArray(scene.sessionHistory) ? scene.sessionHistory : fallback.sessionHistory,
-    cinematicGrammar: scene.cinematicGrammar ?? fallback.cinematicGrammar,
-    atmosphere: scene.atmosphere ?? fallback.atmosphere,
+    cinematicGrammar: sanitizeCinematicGrammar(scene.cinematicGrammar, fallback.cinematicGrammar),
+    atmosphere: sanitizeAtmosphere(scene.atmosphere, fallback.atmosphere),
     relationships: Array.isArray(scene.relationships) ? scene.relationships : fallback.relationships,
-    rhythm: scene.rhythm ?? fallback.rhythm,
+    rhythm: sanitizeRhythm(scene.rhythm, fallback.rhythm),
     worldPlan: worldPlanOverride ?? scene.worldPlan ?? fallback.worldPlan,
     shotSequence: shotsInfo.shotSequence,
     narrativeState: shotsInfo.narrativeState,

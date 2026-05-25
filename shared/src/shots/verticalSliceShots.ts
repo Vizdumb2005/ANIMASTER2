@@ -1,7 +1,7 @@
 // Vertical Slice Shot Types for 1-minute cinematic shorts
 // Phase 10: "The Last Train"
 
-import { CinematicShot, ShotType } from '../cinematicShots';
+import { CinematicShot } from '../cinematicShots';
 
 export interface VerticalSliceShot extends CinematicShot {
   verticalSliceRole: ShotRole;
