@@ -23,45 +23,38 @@ export default function DemoSelector() {
   }, [collapsed, demos.length]);
 
   async function loadDemos() {
-    try {
-      const result = await fetchDemos();
-      setDemos(result);
-    } catch {
-      // Server might not be running — show empty
+    const result = await fetchDemos();
+    if (result.ok) {
+      setDemos(result.value);
     }
   }
 
   async function launchDemo(demo: DemoExperience) {
     setLoading(true);
-    try {
-      const scene = await interpretScene(demo.initialPrompt);
+    const sceneResult = await interpretScene(demo.initialPrompt);
+    if (sceneResult.ok) {
+      const scene = sceneResult.value;
       for (const actor of scene.actors) {
         actor.joints = initActorJoints(actor.position);
       }
       sceneStore.setScene(scene);
       setActiveDemo(demo.id);
       setMutationIndex(0);
-    } catch {
-      // Fallback handled by interpret route
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }
 
   async function applyMutation(mutation: DemoExperience['mutations'][number], index: number) {
     if (applyingMutation || index !== mutationIndex) return;
     setApplyingMutation(true);
-    try {
-      const currentScene = sceneStore.getScene();
-      const directing = sceneStore.getDirectingContext();
-      const patch = await mutateScene(mutation.prompt, currentScene, directing);
-      sceneStore.applyPatch(patch, mutation.prompt);
+    const currentScene = sceneStore.getScene();
+    const directing = sceneStore.getDirectingContext();
+    const patchResult = await mutateScene(mutation.prompt, currentScene, directing);
+    if (patchResult.ok) {
+      sceneStore.applyPatch(patchResult.value, mutation.prompt);
       setMutationIndex(index + 1);
-    } catch {
-      // Fallback handled by mutate route
-    } finally {
-      setApplyingMutation(false);
     }
+    setApplyingMutation(false);
   }
 
   if (collapsed) {

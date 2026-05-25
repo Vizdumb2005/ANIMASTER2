@@ -265,7 +265,7 @@ export class AIOrchestrator {
         reasoning.push(`${providerName}: success (${response.value.tokensUsed ?? 0} tokens)`);
         return { plan, provider: providerName, fallback: providerName === 'mock' };
       } else {
-        reasoning.push(`${providerName}: failed (${response.error.message})`);
+        reasoning.push(`${providerName}: failed (${response.error.message ?? 'Unknown error'})`);
       }
     }
 
@@ -309,7 +309,7 @@ export class AIOrchestrator {
         reasoning.push(`${providerName}: mutation success`);
         return { plan, provider: providerName, fallback: providerName === 'mock' };
       } else {
-        reasoning.push(`${providerName}: mutation failed (${response.error.message})`);
+        reasoning.push(`${providerName}: mutation failed (${response.error.message ?? 'Unknown error'})`);
       }
     }
 

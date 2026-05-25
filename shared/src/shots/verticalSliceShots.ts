@@ -8,7 +8,7 @@ export interface VerticalSliceShot extends CinematicShot {
   emotionalRequirements: EmotionalRequirement[];
   atmosphericDependencies: AtmosphericDependency[];
   characterBlocking: CharacterBlocking[];
-  timingConstraints: TimingConstraint[];
+  timingConstraints: TimingConstraint;
 }
 
 export type ShotRole = 
@@ -307,7 +307,7 @@ export const VERTICAL_SLICE_SHOTS: Record<string, VerticalSliceShot> = {
     },
     continuity: {
       previousShotRelation: 'climax_build',
-      transitionType: 'tension_cut'
+      transitionType: 'smash_cut'
     },
     verticalSliceRole: 'climax_reveal',
     emotionalRequirements: [

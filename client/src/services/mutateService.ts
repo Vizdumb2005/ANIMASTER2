@@ -1,4 +1,5 @@
 import type { SceneGraph } from '@animaster/shared/scene';
+import { ok, err, type Result } from '@animaster/shared/result';
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3001';
 
@@ -13,7 +14,7 @@ type DirectingContext = {
   };
 };
 
-export async function mutateScene(prompt: string, currentScene: SceneGraph, directing?: DirectingContext): Promise<Partial<SceneGraph>> {
+export async function mutateScene(prompt: string, currentScene: SceneGraph, directing?: DirectingContext): Promise<Result<Partial<SceneGraph>, Error>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35000);
 
@@ -42,21 +43,24 @@ export async function mutateScene(prompt: string, currentScene: SceneGraph, dire
   } catch (error) {
     clearTimeout(timeout);
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timed out — please try again');
+      return err(new Error('Request timed out — please try again'));
     }
-    throw new Error('Network error — check your connection and try again');
+    return err(new Error('Network error — check your connection and try again'));
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
     const details = await readErrorMessage(response);
-    throw new Error(details);
+    return err(new Error(details));
   }
 
   const parsed = (await response.json()) as Partial<SceneGraph>;
-  validatePatch(parsed);
-  return parsed;
+  const validationResult = validatePatch(parsed);
+  if (!validationResult.ok) {
+    return validationResult;
+  }
+  return ok(parsed);
 }
 
 async function readErrorMessage(response: Response) {
@@ -68,8 +72,9 @@ async function readErrorMessage(response: Response) {
   }
 }
 
-function validatePatch(value: unknown): asserts value is Partial<SceneGraph> {
+function validatePatch(value: unknown): Result<void, Error> {
   if (!value || typeof value !== 'object') {
-    throw new Error('Mutate response was not an object');
+    return err(new Error('Mutate response was not an object'));
   }
+  return ok(undefined);
 }

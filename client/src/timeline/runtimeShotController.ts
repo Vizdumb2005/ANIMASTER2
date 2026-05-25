@@ -206,8 +206,9 @@ export class RuntimeShotController {
     };
     
     // Camera movement based on shot specs
+    const movementType = (shot.cameraSpecs.movement as CameraMovement['type']) ?? 'static';
     const cameraMovement: CameraMovement = {
-      type: shot.cameraSpecs.movement,
+      type: movementType,
       speed: shot.cameraSpecs.speed,
       target: this.calculateCameraTarget(shot, cameraPosition)
     };
@@ -437,7 +438,7 @@ export class RuntimeShotController {
       return;
     }
     
-    if (!this.transitionState || this.transitionState.transition.id !== transition.fromShotId) {
+    if (!this.transitionState || this.transitionState.transition.fromShotId !== transition.fromShotId) {
       this.transitionState = {
         transition,
         progress: 0,
@@ -456,7 +457,6 @@ export class RuntimeShotController {
   }
   
   private getShotById(shotId: string): SequencedShot | null {
-    const timelineState = this.timeline.getState();
     const shots = this.timeline.getShots();
     return shots.find((s: SequencedShot) => s.id === shotId) || null;
   }
@@ -490,7 +490,6 @@ export class RuntimeShotController {
   
   private applyCameraAdjustment(adjustment: CameraAdjustment): void {
     if (!this.currentShotState) return;
-    
     switch (adjustment.type) {
       case 'push_in':
         this.currentShotState.cinematicParameters.cameraPosition.zoom *= (1 + adjustment.intensity * 0.3);
@@ -512,26 +511,21 @@ export class RuntimeShotController {
   
   private applyLightingAdjustment(adjustment: LightingAdjustment): void {
     if (!this.currentShotState) return;
-    
     switch (adjustment.type) {
       case 'intensity_change':
         this.currentShotState.cinematicParameters.lighting.intensity *= (1 + adjustment.value);
         break;
       case 'color_shift':
-        // Simplified color shift towards blue
         this.currentShotState.cinematicParameters.lighting.color = '#1e2d4a';
         break;
       case 'contrast_boost':
-        // Would affect post-processing in real implementation
         break;
     }
   }
   
   private applyActorAdjustment(adjustment: ActorAdjustment): void {
     if (!this.currentShotState || this.currentShotState.actorStates.length === 0) return;
-    
     const actor = this.currentShotState.actorStates[0];
-    
     switch (adjustment.type) {
       case 'posture_change':
         actor.posture = adjustment.value;

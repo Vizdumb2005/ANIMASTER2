@@ -1,4 +1,5 @@
 import type { SceneGraph } from '@animaster/shared/scene';
+import { ok, err, type Result } from '@animaster/shared/result';
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3001';
 
@@ -15,7 +16,7 @@ type DirectingContext = {
   };
 };
 
-export async function interpretScene(prompt: string, directing?: DirectingContext): Promise<SceneGraph> {
+export async function interpretScene(prompt: string, directing?: DirectingContext): Promise<Result<SceneGraph, Error>> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35000);
 
@@ -32,21 +33,24 @@ export async function interpretScene(prompt: string, directing?: DirectingContex
   } catch (error) {
     clearTimeout(timeout);
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timed out — please try again');
+      return err(new Error('Request timed out — please try again'));
     }
-    throw new Error('Network error — check your connection and try again');
+    return err(new Error('Network error — check your connection and try again'));
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
     const details = await readErrorMessage(response);
-    throw new Error(details);
+    return err(new Error(details));
   }
 
   const parsed = (await response.json()) as InterpretResponse;
-  validateSceneGraph(parsed);
-  return parsed;
+  const validationResult = validateSceneGraph(parsed);
+  if (!validationResult.ok) {
+    return validationResult;
+  }
+  return ok(parsed);
 }
 
 async function readErrorMessage(response: Response) {
@@ -58,29 +62,31 @@ async function readErrorMessage(response: Response) {
   }
 }
 
-function validateSceneGraph(value: unknown): asserts value is SceneGraph {
+function validateSceneGraph(value: unknown): Result<void, Error> {
   if (!value || typeof value !== 'object') {
-    throw new Error('Interpret response was not an object');
+    return err(new Error('Interpret response was not an object'));
   }
 
   const scene = value as SceneGraph;
   if (typeof scene.id !== 'string' || typeof scene.version !== 'number') {
-    throw new Error('Interpret response is missing scene identity fields');
+    return err(new Error('Interpret response is missing scene identity fields'));
   }
 
   if (!Array.isArray(scene.actors) || scene.actors.length === 0) {
-    throw new Error('Interpret response did not include any actors');
+    return err(new Error('Interpret response did not include any actors'));
   }
 
   if (!scene.environment || typeof scene.environment !== 'object') {
-    throw new Error('Interpret response is missing environment data');
+    return err(new Error('Interpret response is missing environment data'));
   }
 
   if (!scene.camera || typeof scene.camera !== 'object') {
-    throw new Error('Interpret response is missing camera data');
+    return err(new Error('Interpret response is missing camera data'));
   }
 
   if (!Array.isArray(scene.sessionHistory)) {
-    throw new Error('Interpret response is missing session history');
+    return err(new Error('Interpret response is missing session history'));
   }
+
+  return ok(undefined);
 }

@@ -5,7 +5,6 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "dist",
-    "rootDir": "src",
     "types": ["node"],
     "noEmit": false,
     "allowImportingTsExtensions": false,
@@ -16,5 +15,5 @@
       "@animaster/server/*": ["server/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../shared/src"]
 }

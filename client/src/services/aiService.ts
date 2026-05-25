@@ -1,5 +1,7 @@
 // Phase 7 — AI Service: Client-side API for AI orchestration endpoints
 
+import { ok, err, type Result } from '@animaster/shared/result';
+
 const API_BASE = 'http://localhost:3001';
 
 export interface AIStatus {
@@ -57,57 +59,58 @@ export interface DemoExperience {
   provesCapabilities: string[];
 }
 
-export async function fetchAIStatus(): Promise<AIStatus> {
+export async function fetchAIStatus(): Promise<Result<AIStatus, Error>> {
   const res = await fetch(`${API_BASE}/ai/status`);
-  if (!res.ok) throw new Error(`AI status request failed: ${res.status}`);
-  return res.json() as Promise<AIStatus>;
+  if (!res.ok) return err(new Error(`AI status request failed: ${res.status}`));
+  return ok(await res.json() as AIStatus);
 }
 
-export async function debugIntent(prompt: string): Promise<IntentDebug> {
+export async function debugIntent(prompt: string): Promise<Result<IntentDebug, Error>> {
   const res = await fetch(`${API_BASE}/ai/debug/intent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt })
   });
-  if (!res.ok) throw new Error(`Intent debug failed: ${res.status}`);
-  return res.json() as Promise<IntentDebug>;
+  if (!res.ok) return err(new Error(`Intent debug failed: ${res.status}`));
+  return ok(await res.json() as IntentDebug);
 }
 
-export async function debugReasoning(prompt: string): Promise<ReasoningDebug> {
+export async function debugReasoning(prompt: string): Promise<Result<ReasoningDebug, Error>> {
   const res = await fetch(`${API_BASE}/ai/debug/reasoning`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt })
   });
-  if (!res.ok) throw new Error(`Reasoning debug failed: ${res.status}`);
-  return res.json() as Promise<ReasoningDebug>;
+  if (!res.ok) return err(new Error(`Reasoning debug failed: ${res.status}`));
+  return ok(await res.json() as ReasoningDebug);
 }
 
-export async function fetchMemory(): Promise<MemoryState> {
+export async function fetchMemory(): Promise<Result<MemoryState, Error>> {
   const res = await fetch(`${API_BASE}/ai/memory`);
-  if (!res.ok) throw new Error(`Memory fetch failed: ${res.status}`);
-  return res.json() as Promise<MemoryState>;
+  if (!res.ok) return err(new Error(`Memory fetch failed: ${res.status}`));
+  return ok(await res.json() as MemoryState);
 }
 
-export async function clearMemory(): Promise<void> {
+export async function clearMemory(): Promise<Result<void, Error>> {
   const res = await fetch(`${API_BASE}/ai/memory`, { method: 'DELETE' });
-  if (!res.ok) throw new Error(`Memory clear failed: ${res.status}`);
+  if (!res.ok) return err(new Error(`Memory clear failed: ${res.status}`));
+  return ok(undefined);
 }
 
-export async function runPromptTests(): Promise<PromptTestResults> {
+export async function runPromptTests(): Promise<Result<PromptTestResults, Error>> {
   const res = await fetch(`${API_BASE}/ai/tests`, { method: 'POST' });
-  if (!res.ok) throw new Error(`Test run failed: ${res.status}`);
-  return res.json() as Promise<PromptTestResults>;
+  if (!res.ok) return err(new Error(`Test run failed: ${res.status}`));
+  return ok(await res.json() as PromptTestResults);
 }
 
-export async function fetchDemos(): Promise<DemoExperience[]> {
+export async function fetchDemos(): Promise<Result<DemoExperience[], Error>> {
   const res = await fetch(`${API_BASE}/ai/demos`);
-  if (!res.ok) throw new Error(`Demo fetch failed: ${res.status}`);
-  return res.json() as Promise<DemoExperience[]>;
+  if (!res.ok) return err(new Error(`Demo fetch failed: ${res.status}`));
+  return ok(await res.json() as DemoExperience[]);
 }
 
-export async function fetchDemo(id: string): Promise<DemoExperience> {
+export async function fetchDemo(id: string): Promise<Result<DemoExperience, Error>> {
   const res = await fetch(`${API_BASE}/ai/demos/${id}`);
-  if (!res.ok) throw new Error(`Demo fetch failed: ${res.status}`);
-  return res.json() as Promise<DemoExperience>;
+  if (!res.ok) return err(new Error(`Demo fetch failed: ${res.status}`));
+  return ok(await res.json() as DemoExperience);
 }

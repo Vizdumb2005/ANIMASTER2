@@ -28,20 +28,22 @@ export default function SceneSeriesPanel() {
     if (!prompt || isCreating) return;
     setIsCreating(true);
     setError(null);
-    try {
-      const directing = sceneStore.getDirectingContext();
-      const scene = await interpretScene(prompt, directing);
+    const directing = sceneStore.getDirectingContext();
+    const sceneResult = await interpretScene(prompt, directing);
+    
+    if (!sceneResult.ok) {
+      setError(sceneResult.error.message);
+    } else {
+      const scene = sceneResult.value;
       for (const actor of scene.actors) {
         actor.joints = initActorJoints(actor.position);
       }
       sceneStore.setScene(scene);
       sceneStore.addSceneToSeries(scene, prompt);
       setNewScenePrompt('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create scene');
-    } finally {
-      setIsCreating(false);
     }
+    
+    setIsCreating(false);
   }
 
   function handleSaveCurrentToSeries() {

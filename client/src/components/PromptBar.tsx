@@ -21,26 +21,31 @@ export default function PromptBar() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const currentScene = sceneStore.getScene();
-      const hasExistingScene = currentScene.actors.length > 0 && currentScene.version > 0;
+    const currentScene = sceneStore.getScene();
+    const hasExistingScene = currentScene.actors.length > 0 && currentScene.version > 0;
+    const directing = sceneStore.getDirectingContext();
 
-      const directing = sceneStore.getDirectingContext();
-      if (hasExistingScene) {
-        const patch = await mutateScene(trimmedPrompt, currentScene, directing);
-        sceneStore.applyPatch(patch, trimmedPrompt);
+    if (hasExistingScene) {
+      const patchResult = await mutateScene(trimmedPrompt, currentScene, directing);
+      if (!patchResult.ok) {
+        setError(patchResult.error.message);
       } else {
-        const scene = await interpretScene(trimmedPrompt, directing);
+        sceneStore.applyPatch(patchResult.value, trimmedPrompt);
+      }
+    } else {
+      const sceneResult = await interpretScene(trimmedPrompt, directing);
+      if (!sceneResult.ok) {
+        setError(sceneResult.error.message);
+      } else {
+        const scene = sceneResult.value;
         for (const actor of scene.actors) {
           actor.joints = initActorJoints(actor.position);
         }
         sceneStore.setScene(scene);
       }
-    } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : 'Unable to interpret prompt');
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   }
 
   return (
