@@ -226,11 +226,6 @@ function arbitraryRhythm(): fc.Arbitrary<SceneRhythm> {
 // Root
 // ---------------------------------------------------------------------------
 
-/**
- * Generates a minimal, valid SceneGraph for property-based testing.
- * Only required fields are included so that deepEqual on a round-tripped
- * value produces no spurious mismatches from absent optional fields.
- */
 export function arbitrarySceneGraph(): fc.Arbitrary<SceneGraph> {
   return fc.record({
     id:               safeId(),
@@ -241,7 +236,32 @@ export function arbitrarySceneGraph(): fc.Arbitrary<SceneGraph> {
     sessionHistory:   fc.array(arbitrarySessionEntry(), { minLength: 0, maxLength: 5 }),
     cinematicGrammar: arbitraryCinematicGrammar(),
     atmosphere:       arbitraryAtmosphere(),
-    relationships:    fc.array(arbitraryRelationship(), { minLength: 0, maxLength: 3 }),
     rhythm:           arbitraryRhythm(),
-  }) as fc.Arbitrary<SceneGraph>;
+  }).chain(base => {
+    const actorIds = base.actors.map(a => a.id);
+    if (actorIds.length === 0) {
+      return fc.constant({ ...base, relationships: [] });
+    }
+    const relArbitrary = fc.array(
+      fc.record({
+        actorAId:          fc.constantFrom(...actorIds),
+        actorBId:          fc.constantFrom(...actorIds),
+        type:              enumOf(RELATIONSHIP_TYPES_ARR),
+        awarenessRadius:   posInt(0, 500),
+        gazeTarget:        fc.oneof(
+          { arbitrary: fc.constant(null), weight: 1 },
+          { arbitrary: fc.constantFrom(...actorIds), weight: 1 },
+        ),
+        emotionalReaction: fc.oneof(
+          { arbitrary: fc.constant(null),              weight: 1 },
+          { arbitrary: enumOf(ACTOR_EMOTIONS_ARR),     weight: 1 },
+        ),
+      }),
+      { minLength: 0, maxLength: 3 }
+    );
+    return relArbitrary.map(rels => ({
+      ...base,
+      relationships: rels as CharacterRelationship[],
+    }));
+  });
 }

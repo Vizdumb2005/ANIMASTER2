@@ -59,7 +59,7 @@ atmosphere:
   ambientIntensity: 0.5
 relationships:
   - actorAId: "actor_1"
-    actorBId: "actor_2"
+    actorBId: "actor_1"
     type: "stranger"
     awarenessRadius: 5
     gazeTarget: null

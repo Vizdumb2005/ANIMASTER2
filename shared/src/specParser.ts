@@ -60,7 +60,18 @@ export class SpecParser {
       return err(syntaxErrors);
     }
 
-    const val = doc.toJS();
+    let val: any;
+    try {
+      val = doc.toJS();
+    } catch (e: any) {
+      return err([
+        {
+          code: 'SYNTAX_ERROR',
+          location: UNKNOWN_LOCATION,
+          message: e.message || String(e),
+        },
+      ]);
+    }
 
     // ── Phase 2: schema validation ────────────────────────────────────────
 
@@ -113,6 +124,14 @@ export class SpecParser {
       });
       return err(errors);
     }
+    const validActorIds = new Set<string>();
+    if (typeof val === 'object' && val !== null && Array.isArray(val.actors)) {
+      val.actors.forEach((actor: unknown) => {
+        if (actor && typeof actor === 'object' && 'id' in actor && typeof (actor as any).id === 'string') {
+          validActorIds.add((actor as any).id);
+        }
+      });
+    }
 
     // ── Root scalars ──────────────────────────────────────────────────────
 
@@ -126,6 +145,8 @@ export class SpecParser {
       errors.push(missing(['version'], 'version'));
     } else if (typeof val.version !== 'number') {
       errors.push(outOfRange(['version'], "Property 'version' must be a number"));
+    } else if (val.version < 0) {
+      errors.push(outOfRange(['version'], "Property 'version' must be at least 0"));
     }
 
     if (val.seed !== undefined && typeof val.seed !== 'number') {
@@ -351,6 +372,24 @@ export class SpecParser {
         );
       }
 
+      if (a.emotionIntensity !== undefined) {
+        if (typeof a.emotionIntensity !== 'number') {
+          errs.push(
+            outOfRange(
+              [...path, 'emotionIntensity'],
+              "Property 'emotionIntensity' must be a number",
+            ),
+          );
+        } else if (a.emotionIntensity < 0 || a.emotionIntensity > 1) {
+          errs.push(
+            outOfRange(
+              [...path, 'emotionIntensity'],
+              "Property 'emotionIntensity' must be between 0 and 1",
+            ),
+          );
+        }
+      }
+
       if (a.currentAction === undefined) {
         errs.push(missing([...path, 'currentAction'], 'currentAction'));
       } else if (!ACTOR_ACTIONS.includes(a.currentAction as never)) {
@@ -399,6 +438,13 @@ export class SpecParser {
             "Property 'actionElapsed' must be a number",
           ),
         );
+      } else if (a.actionElapsed < 0) {
+        errs.push(
+          outOfRange(
+            [...path, 'actionElapsed'],
+            "Property 'actionElapsed' must be at least 0",
+          ),
+        );
       }
 
       return errs;
@@ -434,6 +480,10 @@ export class SpecParser {
           errs.push(
             outOfRange([...path, key], `Property '${key}' must be a number`),
           );
+        } else if ((e[key] as number) < 1) {
+          errs.push(
+            outOfRange([...path, key], `Property '${key}' must be at least 1`),
+          );
         }
       });
 
@@ -457,6 +507,10 @@ export class SpecParser {
         } else if (typeof c[key] !== 'number') {
           errs.push(
             outOfRange([...path, key], `Property '${key}' must be a number`),
+          );
+        } else if (key === 'zoom' && (c[key] as number) < 0) {
+          errs.push(
+            outOfRange([...path, key], "Property 'zoom' must be at least 0"),
           );
         }
       });
@@ -511,6 +565,13 @@ export class SpecParser {
             "Property 'createdAt' must be a number",
           ),
         );
+      } else if (en.createdAt < 0) {
+        errs.push(
+          outOfRange(
+            [...path, 'createdAt'],
+            "Property 'createdAt' must be at least 0",
+          ),
+        );
       }
 
       return errs;
@@ -537,7 +598,6 @@ export class SpecParser {
           ),
         );
       }
-
       const numberKeys = [
         'spacingMultiplier',
         'motionEnergyScale',
@@ -551,6 +611,10 @@ export class SpecParser {
         } else if (typeof t[key] !== 'number') {
           errs.push(
             outOfRange([...path, key], `Property '${key}' must be a number`),
+          );
+        } else if (key === 'pauseFrequency' && (t[key] as number) < 0) {
+          errs.push(
+            outOfRange([...path, key], "Property 'pauseFrequency' must be at least 0"),
           );
         }
       });
@@ -644,6 +708,13 @@ export class SpecParser {
             "Property 'ambientIntensity' must be a number",
           ),
         );
+      } else if (a.ambientIntensity < 0 || a.ambientIntensity > 1) {
+        errs.push(
+          outOfRange(
+            [...path, 'ambientIntensity'],
+            "Property 'ambientIntensity' must be between 0 and 1",
+          ),
+        );
       }
 
       return errs;
@@ -669,6 +740,13 @@ export class SpecParser {
             "Property 'actorAId' must be a string",
           ),
         );
+      } else if (!validActorIds.has(r.actorAId)) {
+        errs.push({
+          code: 'UNDEFINED_REFERENCE',
+          location: locationFor([...path, 'actorAId']),
+          message: `Actor ID '${r.actorAId}' in relationship actorAId is not defined in actors`,
+          context: formatPath([...path, 'actorAId']),
+        });
       }
 
       if (r.actorBId === undefined) {
@@ -680,6 +758,13 @@ export class SpecParser {
             "Property 'actorBId' must be a string",
           ),
         );
+      } else if (!validActorIds.has(r.actorBId)) {
+        errs.push({
+          code: 'UNDEFINED_REFERENCE',
+          location: locationFor([...path, 'actorBId']),
+          message: `Actor ID '${r.actorBId}' in relationship actorBId is not defined in actors`,
+          context: formatPath([...path, 'actorBId']),
+        });
       }
 
       if (r.type === undefined) {
@@ -702,6 +787,13 @@ export class SpecParser {
             "Property 'awarenessRadius' must be a number",
           ),
         );
+      } else if (r.awarenessRadius < 0) {
+        errs.push(
+          outOfRange(
+            [...path, 'awarenessRadius'],
+            "Property 'awarenessRadius' must be at least 0",
+          ),
+        );
       }
 
       if (r.gazeTarget === undefined) {
@@ -713,7 +805,15 @@ export class SpecParser {
             "Property 'gazeTarget' must be string or null",
           ),
         );
+      } else if (typeof r.gazeTarget === 'string' && !validActorIds.has(r.gazeTarget)) {
+        errs.push({
+          code: 'UNDEFINED_REFERENCE',
+          location: locationFor([...path, 'gazeTarget']),
+          message: `Actor ID '${r.gazeTarget}' in relationship gazeTarget is not defined in actors`,
+          context: formatPath([...path, 'gazeTarget']),
+        });
       }
+
 
       if (r.emotionalReaction === undefined) {
         errs.push(
@@ -731,22 +831,34 @@ export class SpecParser {
         );
       }
 
-      if (
-        r.preferredDistance !== undefined &&
-        typeof r.preferredDistance !== 'number'
-      ) {
-        errs.push(
-          outOfRange(
-            [...path, 'preferredDistance'],
-            "Property 'preferredDistance' must be a number",
-          ),
-        );
+      if (r.preferredDistance !== undefined) {
+        if (typeof r.preferredDistance !== 'number') {
+          errs.push(
+            outOfRange(
+              [...path, 'preferredDistance'],
+              "Property 'preferredDistance' must be a number",
+            ),
+          );
+        } else if (r.preferredDistance < 0) {
+          errs.push(
+            outOfRange(
+              [...path, 'preferredDistance'],
+              "Property 'preferredDistance' must be at least 0",
+            ),
+          );
+        }
       }
 
-      if (r.tension !== undefined && typeof r.tension !== 'number') {
-        errs.push(
-          outOfRange([...path, 'tension'], "Property 'tension' must be a number"),
-        );
+      if (r.tension !== undefined) {
+        if (typeof r.tension !== 'number') {
+          errs.push(
+            outOfRange([...path, 'tension'], "Property 'tension' must be a number"),
+          );
+        } else if (r.tension < 0 || r.tension > 1) {
+          errs.push(
+            outOfRange([...path, 'tension'], "Property 'tension' must be between 0 and 1"),
+          );
+        }
       }
 
       return errs;
@@ -783,6 +895,13 @@ export class SpecParser {
           outOfRange(
             [...path, 'pauseFrequencyPerMinute'],
             "Property 'pauseFrequencyPerMinute' must be a number",
+          ),
+        );
+      } else if (r.pauseFrequencyPerMinute < 0) {
+        errs.push(
+          outOfRange(
+            [...path, 'pauseFrequencyPerMinute'],
+            "Property 'pauseFrequencyPerMinute' must be at least 0",
           ),
         );
       }
