@@ -8,6 +8,7 @@
     "rootDir": "src",
     "types": ["node"],
     "noEmit": false,
+    "allowImportingTsExtensions": false,
     "baseUrl": "..",
     "paths": {
       "@animaster/shared/*": ["shared/src/*"],

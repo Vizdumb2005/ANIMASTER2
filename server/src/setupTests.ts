@@ -111,7 +111,7 @@ globalThis.__TEST_EXPRESS__ = {
       clearCookie: vi.fn().mockReturnThis(),
       setHeader: vi.fn().mockReturnThis(),
       getHeader: vi.fn(),
-      locals: {},
+      locals: {} as Record<string, unknown>,
       statusCode: 200,
     };
     
