@@ -75,19 +75,84 @@ rhythm:
     expect(isOk(result)).toBe(true);
     if (isOk(result)) {
       const graph = result.value;
+      
+      // Top-level fields
       expect(graph.id).toBe('scene_001');
       expect(graph.version).toBe(1);
       expect(graph.seed).toBe(42);
+      
+      // Actors
       expect(graph.actors).toHaveLength(1);
-      expect(graph.actors[0].id).toBe('actor_1');
-      expect(graph.actors[0].position).toEqual({ x: 100, y: 200 });
+      const actor = graph.actors[0];
+      expect(actor.id).toBe('actor_1');
+      expect(actor.label).toBe('Actor One');
+      expect(actor.type).toBe('humanoid');
+      expect(actor.position).toEqual({ x: 100, y: 200 });
+      expect(actor.targetPosition).toBeNull();
+      expect(actor.emotionState).toBe('neutral');
+      expect(actor.currentAction).toBe('idle');
+      expect(actor.actionQueue).toEqual(['idle']);
+      expect(actor.joints).toEqual({
+        head: { x: 100, y: 150 },
+        torso: { x: 100, y: 200 },
+        leftArm: { x: 80, y: 200 },
+        rightArm: { x: 120, y: 200 },
+        leftLeg: { x: 90, y: 250 },
+        rightLeg: { x: 110, y: 250 },
+      });
+      expect(actor.actionElapsed).toBe(0);
+
+      // Environment
       expect(graph.environment.type).toBe('indoor_room');
+      expect(graph.environment.backgroundColor).toBe('#ffffff');
+      expect(graph.environment.floorColor).toBe('#888888');
+      expect(graph.environment.wallColor).toBe('#cccccc');
+      expect(graph.environment.width).toBe(800);
+      expect(graph.environment.height).toBe(600);
+
+      // Camera
+      expect(graph.camera.x).toBe(400);
+      expect(graph.camera.y).toBe(300);
+      expect(graph.camera.zoom).toBe(1);
       expect(graph.camera.mode).toBe('static');
+
+      // Session History
       expect(graph.sessionHistory).toHaveLength(1);
+      const session = graph.sessionHistory[0];
+      expect(session.id).toBe('sess_1');
+      expect(session.prompt).toBe('A simple scene');
+      expect(session.createdAt).toBe(1716634800000);
+
+      // Cinematic Grammar
       expect(graph.cinematicGrammar.tone).toBe('neutral');
+      expect(graph.cinematicGrammar.template).toEqual({
+        cameraMode: 'static',
+        spacingMultiplier: 1.0,
+        motionEnergyScale: 1.0,
+        pauseFrequency: 0.5,
+        contrastBoost: 1.0,
+        headroom: 0.2,
+      });
+
+      // Atmosphere
+      expect(graph.atmosphere.effects).toEqual(['none']);
+      expect(graph.atmosphere.lightingTint).toBe('#ffffff');
       expect(graph.atmosphere.ambientIntensity).toBe(0.5);
+
+      // Relationships
       expect(graph.relationships).toHaveLength(1);
+      const rel = graph.relationships[0];
+      expect(rel.actorAId).toBe('actor_1');
+      expect(rel.actorBId).toBe('actor_1');
+      expect(rel.type).toBe('stranger');
+      expect(rel.awarenessRadius).toBe(5);
+      expect(rel.gazeTarget).toBeNull();
+      expect(rel.emotionalReaction).toBeNull();
+
+      // Rhythm
       expect(graph.rhythm.tempo).toBe('medium');
+      expect(graph.rhythm.pauseFrequencyPerMinute).toBe(4);
+      expect(graph.rhythm.motionEnergyCurve).toBe('linear');
     }
   });
 
