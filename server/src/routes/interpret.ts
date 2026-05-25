@@ -90,6 +90,10 @@ type SceneGraphResponse = {
   };
 };
 
+export type InterpretationResult = SceneGraphResponse & {
+  explanation?: string;
+};
+
 type ActorOverride = {
   actorId: string;
   emotion: SceneGraphResponse['actors'][number]['emotionState'];
@@ -139,7 +143,7 @@ router.post('/', async (request, response) => {
   }
 });
 
-export async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<SceneGraphResponse> {
+export async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<InterpretationResult> {
   const truncatedPrompt = typeof prompt === 'string' ? prompt.trim().substring(0, 2000) : '';
 
   try {
@@ -172,7 +176,11 @@ export async function interpretPrompt(prompt: string, directing?: DirectingConte
     if (!provider || provider.name === 'mock') {
       const fallback = createFallbackScene(truncatedPrompt);
       fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
-      return applyDirectorIntentToScene(fallback, directing?.directorIntent);
+      const scene = applyDirectorIntentToScene(fallback, directing?.directorIntent);
+      return {
+        ...scene,
+        explanation: 'LLM provider is set to mock or is unavailable. Skipped LLM scene interpretation. Inferred fallback scene parameters (environment, actors, cinematic settings) using rule-based parsing of the prompt.'
+      };
     }
 
     let completionResult;
@@ -196,7 +204,12 @@ export async function interpretPrompt(prompt: string, directing?: DirectingConte
       console.error('Scene generation failed, using fallback', completionResult.error);
       const fallback = createFallbackScene(truncatedPrompt);
       fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
-      return fallback;
+      const scene = applyDirectorIntentToScene(fallback, directing?.directorIntent);
+      const errMsg = completionResult.error instanceof Error ? completionResult.error.message : String(completionResult.error);
+      return {
+        ...scene,
+        explanation: `LLM complete call failed with error: ${errMsg}. Skipped LLM interpretation and fell back to rule-based inference for scene parameters based on the prompt.`
+      };
     }
 
     const completion = completionResult.value;
@@ -204,7 +217,11 @@ export async function interpretPrompt(prompt: string, directing?: DirectingConte
       console.error('Provider response was empty');
       const fallback = createFallbackScene(truncatedPrompt);
       fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
-      return fallback;
+      const scene = applyDirectorIntentToScene(fallback, directing?.directorIntent);
+      return {
+        ...scene,
+        explanation: 'LLM provider returned an empty response. Skipped LLM interpretation and fell back to rule-based inference for scene parameters based on the prompt.'
+      };
     }
 
     let parsed: SceneGraphResponse;
@@ -214,7 +231,11 @@ export async function interpretPrompt(prompt: string, directing?: DirectingConte
       console.error('JSON parse of completion content failed, using fallback:', parseErr);
       const fallback = createFallbackScene(truncatedPrompt);
       fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
-      return fallback;
+      const scene = applyDirectorIntentToScene(fallback, directing?.directorIntent);
+      return {
+        ...scene,
+        explanation: `LLM provider response was not valid JSON (${parseErr instanceof Error ? parseErr.message : String(parseErr)}). Skipped LLM interpretation and fell back to rule-based inference for scene parameters based on the prompt.`
+      };
     }
 
     const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
@@ -225,7 +246,11 @@ export async function interpretPrompt(prompt: string, directing?: DirectingConte
     console.error('Fatal error in interpretPrompt, returning fallback scene:', globalError);
     const fallback = createFallbackScene(truncatedPrompt);
     fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, {});
-    return applyDirectorIntentToScene(fallback, directing?.directorIntent);
+    const scene = applyDirectorIntentToScene(fallback, directing?.directorIntent);
+    return {
+      ...scene,
+      explanation: `Fatal error in interpretation pipeline: ${globalError instanceof Error ? globalError.message : String(globalError)}. Skipped standard interpretation and fell back to rule-based inference.`
+    };
   }
 }
 
@@ -294,7 +319,7 @@ function resolveWorldPlan(prompt: string, actorCount: number, scenePlan?: Record
   } as SceneGraphResponse['worldPlan'];
 }
 
-function applyDirectorIntentToScene(scene: SceneGraphResponse, intent?: DirectorIntent): SceneGraphResponse {
+function applyDirectorIntentToScene<T extends SceneGraphResponse>(scene: T, intent?: DirectorIntent): T {
   const adjustments = getDirectorIntentAdjustments(intent);
   if (!adjustments) return scene;
 
@@ -504,8 +529,10 @@ function createFallbackScene(prompt: string): SceneGraphResponse {
 const VALID_EMOTIONS = ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'];
 const VALID_ACTIONS = ['idle', 'walking', 'sitting', 'approaching', 'pacing'];
 
-function sanitizeActor(a: any, index: number): SceneGraphResponse['actors'][number] {
+function sanitizeActor(a: any, index: number, skipped: string[], inferred: string[]): SceneGraphResponse['actors'][number] {
   if (typeof a !== 'object' || a === null) {
+    skipped.push(`actor at index ${index}`);
+    inferred.push(`default actor at index ${index}`);
     return {
       id: `actor_${index + 1}`,
       label: `Actor ${index + 1}`,
@@ -528,47 +555,98 @@ function sanitizeActor(a: any, index: number): SceneGraphResponse['actors'][numb
   }
 
   const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : `actor_${index + 1}`;
+  if (typeof a.id !== 'string' || !a.id.trim()) {
+    skipped.push(`actor_${index + 1} ID`);
+    inferred.push(`actor_${index + 1} ID`);
+  }
+
   const label = typeof a.label === 'string' && a.label.trim() ? a.label.trim() : id;
-  const position = (a.position && typeof a.position.x === 'number' && typeof a.position.y === 'number')
-    ? { x: a.position.x, y: a.position.y }
-    : { x: 400, y: 360 };
+  if (typeof a.label !== 'string' || !a.label.trim()) {
+    skipped.push(`actor label for ${id}`);
+    inferred.push(`actor label set to ID '${id}'`);
+  }
+
+  let position = { x: 400, y: 360 };
+  if (a.position && typeof a.position.x === 'number' && typeof a.position.y === 'number') {
+    position = { x: a.position.x, y: a.position.y };
+  } else {
+    skipped.push(`actor position for ${id}`);
+    inferred.push(`default position {x: 400, y: 360} for ${id}`);
+  }
+
   const targetPosition = (a.targetPosition && typeof a.targetPosition.x === 'number' && typeof a.targetPosition.y === 'number')
     ? { x: a.targetPosition.x, y: a.targetPosition.y }
     : null;
-  const emotionState = VALID_EMOTIONS.includes(a.emotionState) ? a.emotionState : 'neutral';
-  const currentAction = VALID_ACTIONS.includes(a.currentAction) ? a.currentAction : 'idle';
-  const actionQueue = Array.isArray(a.actionQueue)
-    ? a.actionQueue.filter((act: any) => VALID_ACTIONS.includes(act))
-    : ['idle'];
-  if (actionQueue.length === 0) {
-    actionQueue.push('idle');
+  if (a.targetPosition && !(typeof a.targetPosition.x === 'number' && typeof a.targetPosition.y === 'number')) {
+    skipped.push(`invalid targetPosition for ${id}`);
+    inferred.push(`targetPosition set to null for ${id}`);
   }
 
-  const joints = (a.joints &&
+  let emotionState = a.emotionState;
+  if (!VALID_EMOTIONS.includes(emotionState)) {
+    skipped.push(`invalid emotionState '${a.emotionState}' for ${id}`);
+    inferred.push(`'neutral' emotionState for ${id}`);
+    emotionState = 'neutral';
+  }
+
+  let currentAction = a.currentAction;
+  if (!VALID_ACTIONS.includes(currentAction)) {
+    skipped.push(`invalid currentAction '${a.currentAction}' for ${id}`);
+    inferred.push(`'idle' currentAction for ${id}`);
+    currentAction = 'idle';
+  }
+
+  let actionQueue = a.actionQueue;
+  if (Array.isArray(actionQueue)) {
+    const validQueue = actionQueue.filter((act: any) => VALID_ACTIONS.includes(act));
+    if (validQueue.length !== actionQueue.length) {
+      skipped.push(`invalid actions in actionQueue for ${id}`);
+    }
+    actionQueue = validQueue;
+  } else {
+    skipped.push(`missing or invalid actionQueue for ${id}`);
+    actionQueue = ['idle'];
+    inferred.push(`['idle'] actionQueue for ${id}`);
+  }
+  if (actionQueue.length === 0) {
+    actionQueue.push('idle');
+    inferred.push(`injected 'idle' action into empty actionQueue for ${id}`);
+  }
+
+  let joints;
+  if (a.joints &&
     a.joints.head && typeof a.joints.head.x === 'number' && typeof a.joints.head.y === 'number' &&
     a.joints.torso && typeof a.joints.torso.x === 'number' && typeof a.joints.torso.y === 'number' &&
     a.joints.leftArm && typeof a.joints.leftArm.x === 'number' && typeof a.joints.leftArm.y === 'number' &&
     a.joints.rightArm && typeof a.joints.rightArm.x === 'number' && typeof a.joints.rightArm.y === 'number' &&
     a.joints.leftLeg && typeof a.joints.leftLeg.x === 'number' && typeof a.joints.leftLeg.y === 'number' &&
-    a.joints.rightLeg && typeof a.joints.rightLeg.x === 'number' && typeof a.joints.rightLeg.y === 'number')
-    ? {
-        head: { x: a.joints.head.x, y: a.joints.head.y },
-        torso: { x: a.joints.torso.x, y: a.joints.torso.y },
-        leftArm: { x: a.joints.leftArm.x, y: a.joints.leftArm.y },
-        rightArm: { x: a.joints.rightArm.x, y: a.joints.rightArm.y },
-        leftLeg: { x: a.joints.leftLeg.x, y: a.joints.leftLeg.y },
-        rightLeg: { x: a.joints.rightLeg.x, y: a.joints.rightLeg.y }
-      }
-    : {
-        head: { x: position.x, y: position.y - 58 },
-        torso: { x: position.x, y: position.y - 30 },
-        leftArm: { x: position.x - 28, y: position.y - 10 },
-        rightArm: { x: position.x + 28, y: position.y - 10 },
-        leftLeg: { x: position.x - 18, y: position.y + 42 },
-        rightLeg: { x: position.x + 18, y: position.y + 42 }
-      };
+    a.joints.rightLeg && typeof a.joints.rightLeg.x === 'number' && typeof a.joints.rightLeg.y === 'number') {
+    joints = {
+      head: { x: a.joints.head.x, y: a.joints.head.y },
+      torso: { x: a.joints.torso.x, y: a.joints.torso.y },
+      leftArm: { x: a.joints.leftArm.x, y: a.joints.leftArm.y },
+      rightArm: { x: a.joints.rightArm.x, y: a.joints.rightArm.y },
+      leftLeg: { x: a.joints.leftLeg.x, y: a.joints.leftLeg.y },
+      rightLeg: { x: a.joints.rightLeg.x, y: a.joints.rightLeg.y }
+    };
+  } else {
+    skipped.push(`missing or invalid joints for ${id}`);
+    inferred.push(`default stickman joint layout for ${id}`);
+    joints = {
+      head: { x: position.x, y: position.y - 58 },
+      torso: { x: position.x, y: position.y - 30 },
+      leftArm: { x: position.x - 28, y: position.y - 10 },
+      rightArm: { x: position.x + 28, y: position.y - 10 },
+      leftLeg: { x: position.x - 18, y: position.y + 42 },
+      rightLeg: { x: position.x + 18, y: position.y + 42 }
+    };
+  }
 
   const actionElapsed = typeof a.actionElapsed === 'number' && a.actionElapsed >= 0 ? a.actionElapsed : 0;
+  if (typeof a.actionElapsed !== 'number' || a.actionElapsed < 0) {
+    skipped.push(`invalid actionElapsed for ${id}`);
+    inferred.push(`actionElapsed set to 0 for ${id}`);
+  }
 
   return {
     id,
@@ -584,94 +662,331 @@ function sanitizeActor(a: any, index: number): SceneGraphResponse['actors'][numb
   };
 }
 
-function sanitizeEnvironment(env: any, fallbackEnv: SceneGraphResponse['environment']): SceneGraphResponse['environment'] {
-  if (typeof env !== 'object' || env === null) return fallbackEnv;
-  return {
-    type: typeof env.type === 'string' && env.type.trim() ? env.type.trim() : fallbackEnv.type,
-    backgroundColor: typeof env.backgroundColor === 'string' && env.backgroundColor.trim() ? env.backgroundColor.trim() : fallbackEnv.backgroundColor,
-    floorColor: typeof env.floorColor === 'string' && env.floorColor.trim() ? env.floorColor.trim() : fallbackEnv.floorColor,
-    wallColor: typeof env.wallColor === 'string' && env.wallColor.trim() ? env.wallColor.trim() : fallbackEnv.wallColor,
-    width: typeof env.width === 'number' && env.width >= 1 ? env.width : fallbackEnv.width,
-    height: typeof env.height === 'number' && env.height >= 1 ? env.height : fallbackEnv.height,
-  };
+function sanitizeEnvironment(env: any, fallbackEnv: SceneGraphResponse['environment'], skipped: string[], inferred: string[]): SceneGraphResponse['environment'] {
+  if (typeof env !== 'object' || env === null) {
+    skipped.push('environment configuration');
+    inferred.push('default environment settings');
+    return fallbackEnv;
+  }
+
+  let type = fallbackEnv.type;
+  if (typeof env.type === 'string' && env.type.trim()) {
+    type = env.type.trim();
+  } else {
+    skipped.push('environment type');
+    inferred.push(`environment type '${fallbackEnv.type}'`);
+  }
+
+  let backgroundColor = fallbackEnv.backgroundColor;
+  if (typeof env.backgroundColor === 'string' && env.backgroundColor.trim()) {
+    backgroundColor = env.backgroundColor.trim();
+  } else {
+    skipped.push('environment background color');
+    inferred.push(`background color '${fallbackEnv.backgroundColor}'`);
+  }
+
+  let floorColor = fallbackEnv.floorColor;
+  if (typeof env.floorColor === 'string' && env.floorColor.trim()) {
+    floorColor = env.floorColor.trim();
+  } else {
+    skipped.push('environment floor color');
+    inferred.push(`floor color '${fallbackEnv.floorColor}'`);
+  }
+
+  let wallColor = fallbackEnv.wallColor;
+  if (typeof env.wallColor === 'string' && env.wallColor.trim()) {
+    wallColor = env.wallColor.trim();
+  } else {
+    skipped.push('environment wall color');
+    inferred.push(`wall color '${fallbackEnv.wallColor}'`);
+  }
+
+  let width = fallbackEnv.width;
+  if (typeof env.width === 'number' && env.width >= 1) {
+    width = env.width;
+  } else {
+    skipped.push('environment width');
+    inferred.push(`width ${fallbackEnv.width}`);
+  }
+
+  let height = fallbackEnv.height;
+  if (typeof env.height === 'number' && env.height >= 1) {
+    height = env.height;
+  } else {
+    skipped.push('environment height');
+    inferred.push(`height ${fallbackEnv.height}`);
+  }
+
+  return { type, backgroundColor, floorColor, wallColor, width, height };
 }
 
-function sanitizeCamera(cam: any, fallbackCam: SceneGraphResponse['camera']): SceneGraphResponse['camera'] {
-  if (typeof cam !== 'object' || cam === null) return fallbackCam;
-  return {
-    x: typeof cam.x === 'number' ? cam.x : fallbackCam.x,
-    y: typeof cam.y === 'number' ? cam.y : fallbackCam.y,
-    zoom: typeof cam.zoom === 'number' && cam.zoom >= 0 ? cam.zoom : fallbackCam.zoom,
-    mode: typeof cam.mode === 'string' && cam.mode.trim() ? cam.mode.trim() : fallbackCam.mode,
-  };
+function sanitizeCamera(cam: any, fallbackCam: SceneGraphResponse['camera'], skipped: string[], inferred: string[]): SceneGraphResponse['camera'] {
+  if (typeof cam !== 'object' || cam === null) {
+    skipped.push('camera configuration');
+    inferred.push('default camera settings');
+    return fallbackCam;
+  }
+
+  let x = fallbackCam.x;
+  if (typeof cam.x === 'number') {
+    x = cam.x;
+  } else {
+    skipped.push('camera x position');
+    inferred.push(`camera x to ${fallbackCam.x}`);
+  }
+
+  let y = fallbackCam.y;
+  if (typeof cam.y === 'number') {
+    y = cam.y;
+  } else {
+    skipped.push('camera y position');
+    inferred.push(`camera y to ${fallbackCam.y}`);
+  }
+
+  let zoom = fallbackCam.zoom;
+  if (typeof cam.zoom === 'number' && cam.zoom >= 0) {
+    zoom = cam.zoom;
+  } else {
+    skipped.push('camera zoom');
+    inferred.push(`camera zoom to ${fallbackCam.zoom}`);
+  }
+
+  let mode = fallbackCam.mode;
+  if (typeof cam.mode === 'string' && cam.mode.trim()) {
+    mode = cam.mode.trim();
+  } else {
+    skipped.push('camera mode');
+    inferred.push(`camera mode to '${fallbackCam.mode}'`);
+  }
+
+  return { x, y, zoom, mode };
 }
 
-function sanitizeAtmosphere(atmo: any, fallbackAtmo: SceneGraphResponse['atmosphere']): SceneGraphResponse['atmosphere'] {
-  if (typeof atmo !== 'object' || atmo === null) return fallbackAtmo;
-  const effects = Array.isArray(atmo.effects) && atmo.effects.length > 0
-    ? atmo.effects.map((e: any) => typeof e === 'string' ? e.trim() : '').filter(Boolean)
-    : fallbackAtmo.effects;
-  return {
-    effects: effects.length > 0 ? effects : fallbackAtmo.effects,
-    lightingTint: typeof atmo.lightingTint === 'string' && atmo.lightingTint.trim() ? atmo.lightingTint.trim() : fallbackAtmo.lightingTint,
-    ambientIntensity: typeof atmo.ambientIntensity === 'number' && atmo.ambientIntensity >= 0 && atmo.ambientIntensity <= 1 ? atmo.ambientIntensity : fallbackAtmo.ambientIntensity,
-  };
+function sanitizeAtmosphere(atmo: any, fallbackAtmo: SceneGraphResponse['atmosphere'], skipped: string[], inferred: string[]): SceneGraphResponse['atmosphere'] {
+  if (typeof atmo !== 'object' || atmo === null) {
+    skipped.push('atmosphere configuration');
+    inferred.push('default atmosphere profile');
+    return fallbackAtmo;
+  }
+
+  let effects = fallbackAtmo.effects;
+  if (Array.isArray(atmo.effects) && atmo.effects.length > 0) {
+    const validEffects = atmo.effects.map((e: any) => typeof e === 'string' ? e.trim() : '').filter(Boolean);
+    if (validEffects.length > 0) {
+      effects = validEffects;
+    } else {
+      skipped.push('atmosphere effects list');
+      inferred.push(`default effects [${fallbackAtmo.effects.join(', ')}]`);
+    }
+  } else {
+    skipped.push('atmosphere effects');
+    inferred.push(`default effects [${fallbackAtmo.effects.join(', ')}]`);
+  }
+
+  let lightingTint = fallbackAtmo.lightingTint;
+  if (typeof atmo.lightingTint === 'string' && atmo.lightingTint.trim()) {
+    lightingTint = atmo.lightingTint.trim();
+  } else {
+    skipped.push('atmosphere lighting tint');
+    inferred.push(`lighting tint '${fallbackAtmo.lightingTint}'`);
+  }
+
+  let ambientIntensity = fallbackAtmo.ambientIntensity;
+  if (typeof atmo.ambientIntensity === 'number' && atmo.ambientIntensity >= 0 && atmo.ambientIntensity <= 1) {
+    ambientIntensity = atmo.ambientIntensity;
+  } else {
+    skipped.push('atmosphere ambient intensity');
+    inferred.push(`ambient intensity ${fallbackAtmo.ambientIntensity}`);
+  }
+
+  return { effects, lightingTint, ambientIntensity };
 }
 
-function sanitizeCinematicGrammar(cg: any, fallbackCg: SceneGraphResponse['cinematicGrammar']): SceneGraphResponse['cinematicGrammar'] {
-  if (typeof cg !== 'object' || cg === null) return fallbackCg;
-  const tone = typeof cg.tone === 'string' && cg.tone.trim() ? cg.tone.trim() : fallbackCg.tone;
-  const template = (typeof cg.template === 'object' && cg.template !== null) ? cg.template : fallbackCg.template;
+function sanitizeCinematicGrammar(cg: any, fallbackCg: SceneGraphResponse['cinematicGrammar'], skipped: string[], inferred: string[]): SceneGraphResponse['cinematicGrammar'] {
+  if (typeof cg !== 'object' || cg === null) {
+    skipped.push('cinematic grammar configuration');
+    inferred.push('default cinematic grammar settings');
+    return fallbackCg;
+  }
+
+  let tone = fallbackCg.tone;
+  if (typeof cg.tone === 'string' && cg.tone.trim()) {
+    tone = cg.tone.trim();
+  } else {
+    skipped.push('cinematic tone');
+    inferred.push(`cinematic tone '${fallbackCg.tone}'`);
+  }
+
+  if (typeof cg.template !== 'object' || cg.template === null) {
+    skipped.push('cinematic template config');
+    inferred.push('default cinematic template values');
+    return { tone, template: fallbackCg.template };
+  }
+
+  const template = cg.template;
+  let cameraMode = fallbackCg.template.cameraMode;
+  if (typeof template.cameraMode === 'string' && template.cameraMode.trim()) {
+    cameraMode = template.cameraMode.trim();
+  } else {
+    skipped.push('cinematic template cameraMode');
+    inferred.push(`cameraMode '${fallbackCg.template.cameraMode}'`);
+  }
+
+  let spacingMultiplier = fallbackCg.template.spacingMultiplier;
+  if (typeof template.spacingMultiplier === 'number') {
+    spacingMultiplier = template.spacingMultiplier;
+  } else {
+    skipped.push('cinematic template spacingMultiplier');
+    inferred.push(`spacingMultiplier ${fallbackCg.template.spacingMultiplier}`);
+  }
+
+  let motionEnergyScale = fallbackCg.template.motionEnergyScale;
+  if (typeof template.motionEnergyScale === 'number') {
+    motionEnergyScale = template.motionEnergyScale;
+  } else {
+    skipped.push('cinematic template motionEnergyScale');
+    inferred.push(`motionEnergyScale ${fallbackCg.template.motionEnergyScale}`);
+  }
+
+  let pauseFrequency = fallbackCg.template.pauseFrequency;
+  if (typeof template.pauseFrequency === 'number' && template.pauseFrequency >= 0) {
+    pauseFrequency = template.pauseFrequency;
+  } else {
+    skipped.push('cinematic template pauseFrequency');
+    inferred.push(`pauseFrequency ${fallbackCg.template.pauseFrequency}`);
+  }
+
+  let contrastBoost = fallbackCg.template.contrastBoost;
+  if (typeof template.contrastBoost === 'number') {
+    contrastBoost = template.contrastBoost;
+  } else {
+    skipped.push('cinematic template contrastBoost');
+    inferred.push(`contrastBoost ${fallbackCg.template.contrastBoost}`);
+  }
+
+  let headroom = fallbackCg.template.headroom;
+  if (typeof template.headroom === 'number') {
+    headroom = template.headroom;
+  } else {
+    skipped.push('cinematic template headroom');
+    inferred.push(`headroom ${fallbackCg.template.headroom}`);
+  }
+
   return {
     tone,
     template: {
-      cameraMode: typeof template.cameraMode === 'string' && template.cameraMode.trim() ? template.cameraMode.trim() : fallbackCg.template.cameraMode,
-      spacingMultiplier: typeof template.spacingMultiplier === 'number' ? template.spacingMultiplier : fallbackCg.template.spacingMultiplier,
-      motionEnergyScale: typeof template.motionEnergyScale === 'number' ? template.motionEnergyScale : fallbackCg.template.motionEnergyScale,
-      pauseFrequency: typeof template.pauseFrequency === 'number' && template.pauseFrequency >= 0 ? template.pauseFrequency : fallbackCg.template.pauseFrequency,
-      contrastBoost: typeof template.contrastBoost === 'number' ? template.contrastBoost : fallbackCg.template.contrastBoost,
-      headroom: typeof template.headroom === 'number' ? template.headroom : fallbackCg.template.headroom,
+      cameraMode,
+      spacingMultiplier,
+      motionEnergyScale,
+      pauseFrequency,
+      contrastBoost,
+      headroom
     }
   };
 }
 
-function sanitizeRhythm(rhythm: any, fallbackRhythm: SceneGraphResponse['rhythm']): SceneGraphResponse['rhythm'] {
-  if (typeof rhythm !== 'object' || rhythm === null) return fallbackRhythm;
-  return {
-    tempo: typeof rhythm.tempo === 'string' && rhythm.tempo.trim() ? rhythm.tempo.trim() : fallbackRhythm.tempo,
-    pauseFrequencyPerMinute: typeof rhythm.pauseFrequencyPerMinute === 'number' && rhythm.pauseFrequencyPerMinute >= 0 ? rhythm.pauseFrequencyPerMinute : fallbackRhythm.pauseFrequencyPerMinute,
-    motionEnergyCurve: typeof rhythm.motionEnergyCurve === 'string' && rhythm.motionEnergyCurve.trim() ? rhythm.motionEnergyCurve.trim() : fallbackRhythm.motionEnergyCurve,
-  };
+function sanitizeRhythm(rhythm: any, fallbackRhythm: SceneGraphResponse['rhythm'], skipped: string[], inferred: string[]): SceneGraphResponse['rhythm'] {
+  if (typeof rhythm !== 'object' || rhythm === null) {
+    skipped.push('rhythm configuration');
+    inferred.push('default rhythm parameters');
+    return fallbackRhythm;
+  }
+
+  let tempo = fallbackRhythm.tempo;
+  if (typeof rhythm.tempo === 'string' && rhythm.tempo.trim()) {
+    tempo = rhythm.tempo.trim();
+  } else {
+    skipped.push('rhythm tempo');
+    inferred.push(`tempo '${fallbackRhythm.tempo}'`);
+  }
+
+  let pauseFrequencyPerMinute = fallbackRhythm.pauseFrequencyPerMinute;
+  if (typeof rhythm.pauseFrequencyPerMinute === 'number' && rhythm.pauseFrequencyPerMinute >= 0) {
+    pauseFrequencyPerMinute = rhythm.pauseFrequencyPerMinute;
+  } else {
+    skipped.push('rhythm pauseFrequencyPerMinute');
+    inferred.push(`pauseFrequencyPerMinute ${fallbackRhythm.pauseFrequencyPerMinute}`);
+  }
+
+  let motionEnergyCurve = fallbackRhythm.motionEnergyCurve;
+  if (typeof rhythm.motionEnergyCurve === 'string' && rhythm.motionEnergyCurve.trim()) {
+    motionEnergyCurve = rhythm.motionEnergyCurve.trim();
+  } else {
+    skipped.push('rhythm motionEnergyCurve');
+    inferred.push(`motionEnergyCurve '${fallbackRhythm.motionEnergyCurve}'`);
+  }
+
+  return { tempo, pauseFrequencyPerMinute, motionEnergyCurve };
 }
 
-function normalizeSceneGraph(
+export function normalizeSceneGraph(
   scene: SceneGraphResponse & { shotSequence?: SequencedShot[]; narrativeState?: NarrativeState },
   prompt: string,
   worldPlanOverride?: SceneGraphResponse['worldPlan']
-): SceneGraphResponse & { shotSequence?: SequencedShot[]; narrativeState?: NarrativeState } {
+): InterpretationResult & { shotSequence?: SequencedShot[]; narrativeState?: NarrativeState } {
   const fallback = createFallbackScene(prompt);
+  const skipped: string[] = [];
+  const inferred: string[] = [];
 
   const shotsInfo = (scene.shotSequence && scene.shotSequence.length > 0)
     ? { shotSequence: scene.shotSequence, narrativeState: scene.narrativeState }
-    : generateShotSequence(prompt, (scene.actors || fallback.actors) as any);
+    : (() => {
+        skipped.push('shot sequence');
+        inferred.push('generated shot sequence from actors and prompt');
+        return generateShotSequence(prompt, (scene.actors || fallback.actors) as any);
+      })();
 
-  const inputActors = Array.isArray(scene.actors) && scene.actors.length > 0 ? scene.actors : fallback.actors;
-  const sanitizedActors = inputActors.map((actor, idx) => sanitizeActor(actor, idx));
+  let inputActors = scene.actors;
+  if (!Array.isArray(inputActors) || inputActors.length === 0) {
+    skipped.push('actors array');
+    inferred.push('default actors array');
+    inputActors = fallback.actors;
+  }
+
+  const sanitizedActors = inputActors.map((actor, idx) => sanitizeActor(actor, idx, skipped, inferred));
+
+  const environment = sanitizeEnvironment(scene.environment, fallback.environment, skipped, inferred);
+  const camera = sanitizeCamera(scene.camera, fallback.camera, skipped, inferred);
+  
+  let sessionHistory = scene.sessionHistory;
+  if (!Array.isArray(sessionHistory)) {
+    skipped.push('session history');
+    inferred.push('default session history');
+    sessionHistory = fallback.sessionHistory;
+  }
+
+  const cinematicGrammar = sanitizeCinematicGrammar(scene.cinematicGrammar, fallback.cinematicGrammar, skipped, inferred);
+  const atmosphere = sanitizeAtmosphere(scene.atmosphere, fallback.atmosphere, skipped, inferred);
+
+  let relationships = scene.relationships;
+  if (!Array.isArray(relationships)) {
+    skipped.push('relationships array');
+    inferred.push('empty relationships array');
+    relationships = fallback.relationships;
+  }
+
+  const rhythm = sanitizeRhythm(scene.rhythm, fallback.rhythm, skipped, inferred);
+  
+  let explanation: string | undefined = undefined;
+  if (skipped.length > 0 || inferred.length > 0) {
+    explanation = `The intent could not be fully resolved. Skipped: ${skipped.join(', ')}. Inferred: ${inferred.join(', ')}.`;
+  }
 
   return {
     id: typeof scene.id === 'string' ? scene.id : fallback.id,
     version: typeof scene.version === 'number' ? scene.version : fallback.version,
     actors: sanitizedActors,
-    environment: sanitizeEnvironment(scene.environment, fallback.environment),
-    camera: sanitizeCamera(scene.camera, fallback.camera),
-    sessionHistory: Array.isArray(scene.sessionHistory) ? scene.sessionHistory : fallback.sessionHistory,
-    cinematicGrammar: sanitizeCinematicGrammar(scene.cinematicGrammar, fallback.cinematicGrammar),
-    atmosphere: sanitizeAtmosphere(scene.atmosphere, fallback.atmosphere),
-    relationships: Array.isArray(scene.relationships) ? scene.relationships : fallback.relationships,
-    rhythm: sanitizeRhythm(scene.rhythm, fallback.rhythm),
+    environment,
+    camera,
+    sessionHistory,
+    cinematicGrammar,
+    atmosphere,
+    relationships,
+    rhythm,
     worldPlan: worldPlanOverride ?? scene.worldPlan ?? fallback.worldPlan,
     shotSequence: shotsInfo.shotSequence,
     narrativeState: shotsInfo.narrativeState,
+    explanation,
   };
 }
 

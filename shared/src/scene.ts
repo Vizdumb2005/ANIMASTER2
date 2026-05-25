@@ -562,6 +562,7 @@ export interface SceneGraph {
   relationships: CharacterRelationship[];
   rhythm: SceneRhythm;
   continuity?: ContinuityState;
+  explanation?: string;
   // Phase 2.6
   emotionalSpatial?: EmotionalSpatialState;
   dramaticBeats?: DramaticBeat[];
