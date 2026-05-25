@@ -25,6 +25,61 @@ import type {
 } from './scene.js';
 
 // ---------------------------------------------------------------------------
+// ParseError — canonical structured error type
+// ---------------------------------------------------------------------------
+
+/**
+ * Discriminant code that identifies the category of a parse/validation error.
+ *
+ * | Code                | Meaning                                                        |
+ * |---------------------|----------------------------------------------------------------|
+ * | SYNTAX_ERROR        | The raw YAML text is malformed and cannot be parsed            |
+ * | MISSING_REQUIRED    | A field marked `required: true` in the schema is absent        |
+ * | OUT_OF_RANGE        | A value is outside its allowed set (enum) or numeric range     |
+ * | UNDEFINED_REFERENCE | A string ID refers to an entity that does not exist in the doc |
+ */
+export type ParseErrorCode =
+  | 'SYNTAX_ERROR'
+  | 'MISSING_REQUIRED'
+  | 'OUT_OF_RANGE'
+  | 'UNDEFINED_REFERENCE';
+
+/** Source position within the YAML document. Both values are 1-based. */
+export interface ParseErrorLocation {
+  /** 1-based line number; 0 when position could not be determined */
+  line: number;
+  /** 1-based column number; 0 when position could not be determined */
+  column: number;
+}
+
+/**
+ * A structured error produced by the parser or any schema validator.
+ *
+ * @example
+ * ```ts
+ * {
+ *   code: 'MISSING_REQUIRED',
+ *   location: { line: 12, column: 3 },
+ *   message: "Property 'emotionState' is required",
+ *   context: 'actors[0].emotionState',
+ * }
+ * ```
+ */
+export interface ParseError {
+  /** Categorical error code for programmatic handling */
+  code: ParseErrorCode;
+  /** Source location within the YAML document */
+  location: ParseErrorLocation;
+  /** Human-readable description of the error */
+  message: string;
+  /**
+   * Dot-path / bracket-path to the offending field, e.g. `actors[0].emotionState`.
+   * Present for all schema errors; absent for top-level SYNTAX_ERRORs.
+   */
+  context?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Enum value arrays
 // Each array mirrors the corresponding union type in scene.ts exactly.
 // ---------------------------------------------------------------------------

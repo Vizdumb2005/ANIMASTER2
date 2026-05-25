@@ -102,8 +102,14 @@ actors: [
     if (isErr(result)) {
       const errors = result.error;
       expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].line).toBeDefined();
-      expect(errors[0].column).toBeDefined();
+      // All syntax errors carry SYNTAX_ERROR code
+      expect(errors[0].code).toBe('SYNTAX_ERROR');
+      // location is always a required object with line / column
+      expect(errors[0].location).toBeDefined();
+      expect(typeof errors[0].location.line).toBe('number');
+      expect(typeof errors[0].location.column).toBe('number');
+      // Syntax errors have a non-zero line because the YAML lib resolves them
+      expect(errors[0].location.line).toBeGreaterThan(0);
     }
   });
 
@@ -123,40 +129,51 @@ camera:
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
       const errors = result.error;
-      // We should have errors for: id, version, seed, actors missing, environment type/width, camera x/y/zoom/sessionHistory missing, etc.
+      // We should have errors for: id, version, seed, actors missing,
+      // environment type/width, camera x/y/zoom, sessionHistory missing, etc.
       expect(errors.length).toBeGreaterThan(3);
 
-      const idError = errors.find(e => e.path === 'id');
+      const idError = errors.find(e => e.context === 'id');
       expect(idError).toBeDefined();
+      expect(idError?.code).toBe('OUT_OF_RANGE');
       expect(idError?.message).toContain('must be a string');
 
-      const versionError = errors.find(e => e.path === 'version');
+      const versionError = errors.find(e => e.context === 'version');
       expect(versionError).toBeDefined();
+      expect(versionError?.code).toBe('OUT_OF_RANGE');
       expect(versionError?.message).toContain('must be a number');
 
-      const seedError = errors.find(e => e.path === 'seed');
+      const seedError = errors.find(e => e.context === 'seed');
       expect(seedError).toBeDefined();
+      expect(seedError?.code).toBe('OUT_OF_RANGE');
       expect(seedError?.message).toContain('must be a number');
 
-      const actorsError = errors.find(e => e.path === 'actors');
+      const actorsError = errors.find(e => e.context === 'actors');
       expect(actorsError).toBeDefined();
+      expect(actorsError?.code).toBe('MISSING_REQUIRED');
       expect(actorsError?.message).toContain('is required');
 
-      const envTypeError = errors.find(e => e.path === 'environment.type');
+      const envTypeError = errors.find(e => e.context === 'environment.type');
       expect(envTypeError).toBeDefined();
+      expect(envTypeError?.code).toBe('OUT_OF_RANGE');
       expect(envTypeError?.message).toContain('must be a string');
 
-      const envWidthError = errors.find(e => e.path === 'environment.width');
+      const envWidthError = errors.find(e => e.context === 'environment.width');
       expect(envWidthError).toBeDefined();
+      expect(envWidthError?.code).toBe('OUT_OF_RANGE');
       expect(envWidthError?.message).toContain('must be a number');
 
-      const cameraXError = errors.find(e => e.path === 'camera.x');
+      const cameraXError = errors.find(e => e.context === 'camera.x');
       expect(cameraXError).toBeDefined();
+      expect(cameraXError?.code).toBe('MISSING_REQUIRED');
       expect(cameraXError?.message).toContain('is required');
 
-      // Verify line and column are resolved for errors
-      expect(idError?.line).toBeDefined();
-      expect(idError?.column).toBeDefined();
+      // location is always a well-formed object
+      expect(idError?.location).toBeDefined();
+      expect(typeof idError?.location.line).toBe('number');
+      expect(typeof idError?.location.column).toBe('number');
+      // The `id` field is present in the doc (wrong type) — line should be resolved
+      expect(idError?.location.line).toBeGreaterThan(0);
     }
   });
 
@@ -216,40 +233,61 @@ rhythm:
     if (isErr(result)) {
       const errors = result.error;
 
-      const typeError = errors.find(e => e.path === 'actors[0].type');
+      const typeError = errors.find(e => e.context === 'actors[0].type');
       expect(typeError).toBeDefined();
+      expect(typeError?.code).toBe('OUT_OF_RANGE');
       expect(typeError?.message).toContain("must be 'humanoid'");
 
-      const posXError = errors.find(e => e.path === 'actors[0].position.x');
+      const posXError = errors.find(e => e.context === 'actors[0].position.x');
       expect(posXError).toBeDefined();
+      expect(posXError?.code).toBe('OUT_OF_RANGE');
       expect(posXError?.message).toContain('must be a number');
 
-      const posYError = errors.find(e => e.path === 'actors[0].position.y');
+      const posYError = errors.find(e => e.context === 'actors[0].position.y');
       expect(posYError).toBeDefined();
+      expect(posYError?.code).toBe('MISSING_REQUIRED');
       expect(posYError?.message).toContain('is required');
 
-      const targetPosError = errors.find(e => e.path === 'actors[0].targetPosition');
+      const targetPosError = errors.find(
+        e => e.context === 'actors[0].targetPosition',
+      );
       expect(targetPosError).toBeDefined();
+      expect(targetPosError?.code).toBe('MISSING_REQUIRED');
       expect(targetPosError?.message).toContain('is required');
 
-      const emotionError = errors.find(e => e.path === 'actors[0].emotionState');
+      const emotionError = errors.find(
+        e => e.context === 'actors[0].emotionState',
+      );
       expect(emotionError).toBeDefined();
+      expect(emotionError?.code).toBe('OUT_OF_RANGE');
       expect(emotionError?.message).toContain('must be one of');
 
-      const actionError = errors.find(e => e.path === 'actors[0].currentAction');
+      const actionError = errors.find(
+        e => e.context === 'actors[0].currentAction',
+      );
       expect(actionError).toBeDefined();
+      expect(actionError?.code).toBe('OUT_OF_RANGE');
       expect(actionError?.message).toContain('must be one of');
 
-      const queueError = errors.find(e => e.path === 'actors[0].actionQueue[0]');
+      const queueError = errors.find(
+        e => e.context === 'actors[0].actionQueue[0]',
+      );
       expect(queueError).toBeDefined();
+      expect(queueError?.code).toBe('OUT_OF_RANGE');
       expect(queueError?.message).toContain('must be one of');
 
-      const jointsTorsoError = errors.find(e => e.path === 'actors[0].joints.torso');
+      const jointsTorsoError = errors.find(
+        e => e.context === 'actors[0].joints.torso',
+      );
       expect(jointsTorsoError).toBeDefined();
+      expect(jointsTorsoError?.code).toBe('MISSING_REQUIRED');
       expect(jointsTorsoError?.message).toContain('is required in joints');
 
-      const elapsedError = errors.find(e => e.path === 'actors[0].actionElapsed');
+      const elapsedError = errors.find(
+        e => e.context === 'actors[0].actionElapsed',
+      );
       expect(elapsedError).toBeDefined();
+      expect(elapsedError?.code).toBe('OUT_OF_RANGE');
       expect(elapsedError?.message).toContain('must be a number');
     }
   });
@@ -302,25 +340,56 @@ rhythm:
     if (isErr(result)) {
       const errors = result.error;
 
-      const actorAError = errors.find(e => e.path === 'relationships[0].actorAId');
+      const actorAError = errors.find(
+        e => e.context === 'relationships[0].actorAId',
+      );
       expect(actorAError).toBeDefined();
+      expect(actorAError?.code).toBe('OUT_OF_RANGE');
       expect(actorAError?.message).toContain('must be a string');
 
-      const typeError = errors.find(e => e.path === 'relationships[0].type');
+      const typeError = errors.find(
+        e => e.context === 'relationships[0].type',
+      );
       expect(typeError).toBeDefined();
+      expect(typeError?.code).toBe('OUT_OF_RANGE');
       expect(typeError?.message).toContain('must be one of');
 
-      const radiusError = errors.find(e => e.path === 'relationships[0].awarenessRadius');
+      const radiusError = errors.find(
+        e => e.context === 'relationships[0].awarenessRadius',
+      );
       expect(radiusError).toBeDefined();
+      expect(radiusError?.code).toBe('OUT_OF_RANGE');
       expect(radiusError?.message).toContain('must be a number');
 
-      const gazeError = errors.find(e => e.path === 'relationships[0].gazeTarget');
+      const gazeError = errors.find(
+        e => e.context === 'relationships[0].gazeTarget',
+      );
       expect(gazeError).toBeDefined();
+      expect(gazeError?.code).toBe('OUT_OF_RANGE');
       expect(gazeError?.message).toContain('must be string or null');
 
-      const emotionError = errors.find(e => e.path === 'relationships[0].emotionalReaction');
+      const emotionError = errors.find(
+        e => e.context === 'relationships[0].emotionalReaction',
+      );
       expect(emotionError).toBeDefined();
+      expect(emotionError?.code).toBe('OUT_OF_RANGE');
       expect(emotionError?.message).toContain('must be null or one of');
+    }
+  });
+
+  it('should always return a well-formed ParseError shape', () => {
+    // Even for totally empty input the shape must be correct
+    const result = SpecParser.parse('');
+    // Empty YAML parses to null, triggers root-object check
+    if (isErr(result)) {
+      for (const e of result.error) {
+        expect(typeof e.code).toBe('string');
+        expect(['SYNTAX_ERROR', 'MISSING_REQUIRED', 'OUT_OF_RANGE', 'UNDEFINED_REFERENCE']).toContain(e.code);
+        expect(e.location).toBeDefined();
+        expect(typeof e.location.line).toBe('number');
+        expect(typeof e.location.column).toBe('number');
+        expect(typeof e.message).toBe('string');
+      }
     }
   });
 });
