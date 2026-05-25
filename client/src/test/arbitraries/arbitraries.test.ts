@@ -5,9 +5,14 @@ import {
   arbitraryActorEmotion, 
   arbitrarySceneTone,
   arbitrarySceneGraph,
+  arbitraryMalformedYaml,
+  arbitraryOutOfRangeSpec,
   ACTOR_EMOTIONS,
   SCENE_TONES
 } from './index';
+import { SpecParser } from '@animaster/shared/specParser';
+import { isOk } from '@animaster/shared/result';
+
 
 describe('Fast-Check Arbitraries Validation', () => {
   it('should generate valid Vector2 objects', () => {
@@ -50,4 +55,25 @@ describe('Fast-Check Arbitraries Validation', () => {
       })
     );
   });
+
+  it('should generate malformed YAML strings that fail parsing', () => {
+    fc.assert(
+      fc.property(arbitraryMalformedYaml(), (yaml) => {
+        const result = SpecParser.parse(yaml);
+        expect(isOk(result)).toBe(false);
+        return true;
+      })
+    );
+  });
+
+  it('should generate out of range specs that fail parsing', () => {
+    fc.assert(
+      fc.property(arbitraryOutOfRangeSpec(), (yaml) => {
+        const result = SpecParser.parse(yaml);
+        expect(isOk(result)).toBe(false);
+        return true;
+      })
+    );
+  });
 });
+
