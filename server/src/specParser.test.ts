@@ -442,6 +442,103 @@ rhythm:
     }
   });
 
+  it('should collect and report 5 distinct error types correctly', () => {
+    // 1. Syntax Error (parse a malformed YAML document)
+    const malformedYaml = `
+id: "scene_001
+version: 1
+`;
+    const result1 = SpecParser.parse(malformedYaml);
+    expect(isErr(result1)).toBe(true);
+    if (isErr(result1)) {
+      expect(result1.error.some(e => e.code === 'SYNTAX_ERROR')).toBe(true);
+    }
+
+    // 2. Schema Validation Errors (Missing Required, Out of Range (numeric), Out of Range (enum), Undefined Reference)
+    const invalidYaml = `
+version: -1                      # Out of Range (numeric: must be >= 0)
+actors:
+  - id: "actor_1"
+    label: "Actor One"
+    type: "humanoid"
+    position: { x: 100, y: 200 }
+    targetPosition: null
+    emotionState: "super_happy"  # Out of Range (enum: invalid emotion)
+    currentAction: "idle"
+    actionQueue: ["idle"]
+    joints:
+      head: { x: 100, y: 150 }
+      torso: { x: 100, y: 200 }
+      leftArm: { x: 80, y: 200 }
+      rightArm: { x: 120, y: 200 }
+      leftLeg: { x: 90, y: 250 }
+      rightLeg: { x: 110, y: 250 }
+    actionElapsed: 0
+environment:
+  type: "indoor_room"
+  backgroundColor: "#ffffff"
+  floorColor: "#888888"
+  wallColor: "#cccccc"
+  width: 800
+  height: 600
+camera:
+  x: 400
+  y: 300
+  zoom: 1
+  mode: "static"
+sessionHistory: []
+cinematicGrammar:
+  tone: "neutral"
+  template:
+    cameraMode: "static"
+    spacingMultiplier: 1.0
+    motionEnergyScale: 1.0
+    pauseFrequency: 0.5
+    contrastBoost: 1.0
+    headroom: 0.2
+atmosphere:
+  effects: []
+  lightingTint: "#ffffff"
+  ambientIntensity: 0.5
+relationships:
+  - actorAId: "non_existent"     # Undefined Reference
+    actorBId: "actor_1"
+    type: "stranger"
+    awarenessRadius: 5
+    gazeTarget: null
+    emotionalReaction: null
+rhythm:
+  tempo: "medium"
+  pauseFrequencyPerMinute: 4
+  motionEnergyCurve: "linear"
+`;
+    // Note: 'id' is missing from the above YAML (Missing Required)
+    const result2 = SpecParser.parse(invalidYaml);
+    expect(isErr(result2)).toBe(true);
+    if (isErr(result2)) {
+      const errors = result2.error;
+
+      // Let's verify each distinct error code is reported correctly
+      const missingRequired = errors.filter(e => e.code === 'MISSING_REQUIRED');
+      const outOfRange = errors.filter(e => e.code === 'OUT_OF_RANGE');
+      const undefinedRef = errors.filter(e => e.code === 'UNDEFINED_REFERENCE');
+
+      // Verify MISSING_REQUIRED code
+      expect(missingRequired.length).toBeGreaterThan(0);
+      expect(missingRequired.some(e => e.context === 'id')).toBe(true);
+
+      // Verify OUT_OF_RANGE code (numeric violation)
+      expect(outOfRange.some(e => e.context === 'version' && e.message.includes('must be at least 0'))).toBe(true);
+
+      // Verify OUT_OF_RANGE code (enum violation)
+      expect(outOfRange.some(e => e.context === 'actors[0].emotionState' && e.message.includes('must be one of'))).toBe(true);
+
+      // Verify UNDEFINED_REFERENCE code
+      expect(undefinedRef.length).toBeGreaterThan(0);
+      expect(undefinedRef.some(e => e.context === 'relationships[0].actorAId')).toBe(true);
+    }
+  });
+
   it('should always return a well-formed ParseError shape', () => {
     // Even for totally empty input the shape must be correct
     const result = SpecParser.parse('');
