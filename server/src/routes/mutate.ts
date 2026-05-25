@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { providerRegistry } from '../ai/providers/providerRegistry.js';
 import { orchestrator } from '../ai/runtime/orchestrator.js';
 import type { ProviderName } from '../ai/providers/providerInterface.js';
+import { isOk, isErr } from '../types/result.js';
 import { getDirectorIntentAdjustments, type DirectorIntent } from '../ai/directing/directorIntent.js';
 import {
   buildSceneMutationUserPrompt,
@@ -142,28 +143,31 @@ async function mutateScene(prompt: string, currentScene: unknown, directing?: Di
   }
 
   let parsed: ScenePatch;
-  try {
-    const completion = await provider.complete({
-      messages: [
-        { role: 'system', content: sceneMutationSystemPrompt },
-        { role: 'user', content: buildSceneMutationUserPrompt(prompt, JSON.stringify(currentScene, null, 2), context) }
-      ],
-      temperature: 0.2,
-      maxTokens: 1500,
-      responseFormat: 'json',
-      jsonSchema: sceneMutationResponseSchema
-    });
+  const completionResult = await provider.complete({
+    messages: [
+      { role: 'system', content: sceneMutationSystemPrompt },
+      { role: 'user', content: buildSceneMutationUserPrompt(prompt, JSON.stringify(currentScene, null, 2), context) }
+    ],
+    temperature: 0.2,
+    maxTokens: 1500,
+    responseFormat: 'json',
+    jsonSchema: sceneMutationResponseSchema
+  });
 
-    if (!completion.content || !completion.content.trim()) {
-      throw new Error('Provider response did not include patch JSON');
-    }
-
-    parsed = JSON.parse(completion.content) as ScenePatch;
-  } catch (error) {
+  if (isErr(completionResult)) {
     const fallback = createFallbackPatch(prompt, scene);
     const directedFallback = applyDirectorIntentToPatch(fallback, scene, directing?.directorIntent);
     return applyActorOverrides(directedFallback, scene, directing?.actorOverrides);
   }
+
+  const completion = completionResult.value;
+  if (!completion.content || !completion.content.trim()) {
+    const fallback = createFallbackPatch(prompt, scene);
+    const directedFallback = applyDirectorIntentToPatch(fallback, scene, directing?.directorIntent);
+    return applyActorOverrides(directedFallback, scene, directing?.actorOverrides);
+  }
+
+  parsed = JSON.parse(completion.content) as ScenePatch;
 
   const normalized = normalizePatch(parsed, scene);
   const directedPatch = applyDirectorIntentToPatch(normalized, scene, directing?.directorIntent);

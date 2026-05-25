@@ -1,8 +1,9 @@
 // Shot Sequencer for 1-minute cinematic shorts
 // Phase 10: Vertical Slice
 
-import { PlannedShot } from './shotPlanner.js';
+import { PlannedShot, CameraSpecs, FramingSpecs, TransitionSpecs } from './shotPlanner.js';
 import { EmotionalBeat } from '../narrative/narrativeArcGenerator.js';
+import { ShotType } from '../types/sharedTypes.js';
 
 export interface ShotSequence {
   id: string;
@@ -21,7 +22,10 @@ export interface SequencedShot extends PlannedShot {
   transitionEndTime?: number;
   emotionalContext: EmotionalContext;
   durationSeconds: number;
+  cameraSpecs: CameraSpecs;
   emotionalWeight: number;
+  transition: TransitionSpecs;
+  shotType: ShotType;
   emotionalIntent: string;
 }
 

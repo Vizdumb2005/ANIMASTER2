@@ -10,8 +10,10 @@ import type {
   DialogueRequest,
   EnvironmentIntentRequest,
   CameraIntentRequest,
-  BlockingIntentRequest
+  BlockingIntentRequest,
+  AIError
 } from './providerInterface.js';
+import { err, ok, Result } from '../../types/result.js';
 import {
   buildScenePlanPrompt,
   buildMutationPlanPrompt,
@@ -36,7 +38,7 @@ export class GeminiProvider implements AIProvider {
     return this._isAvailable;
   }
 
-  async initialize(config: AIProviderConfig): Promise<void> {
+  async initialize(config: AIProviderConfig): Promise<Result<void, AIError>> {
     this.apiKey = config.apiKey ?? '';
     this.model = config.model ?? 'gemini-2.0-flash';
     this.baseUrl = config.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta';
@@ -44,11 +46,12 @@ export class GeminiProvider implements AIProvider {
     this.defaultTemperature = config.temperature ?? 0.2;
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this._isAvailable = this.apiKey.length > 0;
+    return ok(undefined);
   }
 
-  async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
+  async complete(request: AICompletionRequest): Promise<Result<AICompletionResponse, AIError>> {
     if (!this._isAvailable) {
-      throw new Error('Gemini provider not available — no API key configured');
+      return err({ message: 'Gemini provider not available — no API key configured' });
     }
 
     const controller = new AbortController();
@@ -89,7 +92,7 @@ export class GeminiProvider implements AIProvider {
       });
 
       if (!result.ok) {
-        throw new Error(`Gemini request failed: ${result.status}`);
+        return err({ message: `Gemini request failed: ${result.status}` });
       }
 
       const payload = (await result.json()) as {
@@ -98,19 +101,21 @@ export class GeminiProvider implements AIProvider {
       };
 
       const content = payload.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      return {
+      return ok({
         content,
         model: this.model,
         provider: this.name,
         tokensUsed: payload.usageMetadata?.totalTokenCount,
         latencyMs: Date.now() - start
-      };
+      });
+    } catch (error) {
+      return err({ message: error instanceof Error ? error.message : 'Unknown error in Gemini provider' });
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  async generateScenePlan(request: CinematicPlanRequest): Promise<AICompletionResponse> {
+  async generateScenePlan(request: CinematicPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildScenePlanPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -118,7 +123,7 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  async generateMutationPlan(request: MutationPlanRequest): Promise<AICompletionResponse> {
+  async generateMutationPlan(request: MutationPlanRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildMutationPlanPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -126,7 +131,7 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  async generateDialogue(request: DialogueRequest): Promise<AICompletionResponse> {
+  async generateDialogue(request: DialogueRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildDialoguePrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -134,7 +139,7 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<AICompletionResponse> {
+  async generateEnvironmentIntent(request: EnvironmentIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildEnvironmentPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -142,7 +147,7 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  async generateBlockingIntent(request: BlockingIntentRequest): Promise<AICompletionResponse> {
+  async generateBlockingIntent(request: BlockingIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildBlockingPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -150,7 +155,7 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  async generateCameraIntent(request: CameraIntentRequest): Promise<AICompletionResponse> {
+  async generateCameraIntent(request: CameraIntentRequest): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildCameraPrompt(request);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
@@ -158,7 +163,7 @@ export class GeminiProvider implements AIProvider {
     });
   }
 
-  async summarizeSceneMemory(sceneJson: string): Promise<AICompletionResponse> {
+  async summarizeSceneMemory(sceneJson: string): Promise<Result<AICompletionResponse, AIError>> {
     const { system, user } = buildMemorySummaryPrompt(sceneJson);
     return this.complete({
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],

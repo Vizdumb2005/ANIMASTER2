@@ -11,18 +11,42 @@ import { VideoAssembler } from '../export/videoAssembler';
 import type { SequencedShot } from '../../../server/src/shots/shotSequencer';
 import type { TransitionPlan } from '../../../server/src/shots/transitionPlanner';
 import type { EmotionalBeat } from '../../../server/src/narrative/narrativeArcGenerator';
+import type { CameraSpecs, FramingSpecs } from '../../../server/src/shots/shotPlanner';
+import type { PacingAnalysis } from '../../../server/src/shots/pacingPlanner';
 
-
-interface FilmCompletedData {
+interface FilmCompletionData {
+  shots: Array<{
+    id: string;
+    shotType: string;
+    emotionalIntent: string;
+    narrativePurpose: string;
+    duration: number;
+    framing: FramingSpecs;
+    camera: CameraSpecs;
+    pacing: PacingAnalysis;
+  }>;
+  emotionalArc: Array<{
+    time: number;
+    emotion: string;
+    intensity: number;
+  }>;
+  atmosphere: {
+    effects: string[];
+    lighting: string;
+    audio: string[];
+  };
+  totalDuration: number;
+  frameCount: number;
+  resolution: { width: number; height: number };
+  frameRate: number;
   url: string;
-  duration: number;
   format: string;
-  resolution: string;
+  duration: number;
 }
 
 interface VerticalSliceFilmProps {
   prompt?: string;
-  onFilmComplete?: (filmData: FilmCompletedData) => void;
+  onFilmComplete?: (filmData: FilmCompletionData) => void;
   onProgressUpdate?: (progress: number, stage: string) => void;
 }
 
@@ -48,7 +72,7 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
   const timelineRendererRef = useRef<TimelineRenderer | null>(null);
   const videoAssemblerRef = useRef<VideoAssembler | null>(null);
   
-  const animationFrameRef = useRef<number | undefined>(undefined);
+  const animationFrameRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
   
   // Initialize systems
@@ -417,11 +441,25 @@ export const VerticalSliceFilm: React.FC<VerticalSliceFilmProps> = ({
             onProgressUpdate?.(1, 'rendered');
             
             // Notify completion
+            const resolutionParts = output.resolution.split('x');
             onFilmComplete?.({
+              shots: [], // Would be populated with actual shot data in real implementation
+              emotionalArc: [], // Would be populated with emotional arc data
+              atmosphere: {
+                effects: [],
+                lighting: 'cinematic',
+                audio: []
+              },
+              totalDuration: output.duration,
+              frameCount: output.duration * config.frameRate,
+              resolution: {
+                width: parseInt(resolutionParts[0] || '1920'),
+                height: parseInt(resolutionParts[1] || '1080')
+              },
+              frameRate: config.frameRate,
               url: output.url,
-              duration: output.duration,
               format: output.format,
-              resolution: output.resolution
+              duration: output.duration
             });
           }
         }

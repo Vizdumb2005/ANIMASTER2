@@ -230,10 +230,16 @@ export interface CinematicShot {
   };
 }
 
+export interface ContinuityTrackerEntry {
+  initialX: number;
+  initialY: number;
+  screenSide: 'left' | 'right';
+}
+
 export interface NarrativeState {
   currentTheme: string;
   emotionalTrajectory: string[];
-  continuityTracker: Record<string, any>;
+  continuityTracker: Record<string, ContinuityTrackerEntry>;
   motifOccurrences: Record<string, number>;
 }
 

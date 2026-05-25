@@ -2,24 +2,24 @@
 // Phase 10: "The Last Train"
 
 import { generateNarrativeArc, NarrativeArc } from '../narrative/narrativeArcGenerator.js';
-import { generateEmotionalProgression } from '../narrative/emotionalProgression.js';
-import { analyzeEscalation } from '../narrative/cinematicEscalation.js';
-import { planShotsFromArc } from '../shots/shotPlanner.js';
-import { sequenceShots } from '../shots/shotSequencer.js';
-import { planTransitions } from '../shots/transitionPlanner.js';
-import { analyzePacing } from '../shots/pacingPlanner.js';
+import { generateEmotionalProgression, EmotionalTransition } from '../narrative/emotionalProgression.js';
+import { analyzeEscalation, EscalationProfile } from '../narrative/cinematicEscalation.js';
+import { planShotsFromArc, PlannedShot } from '../shots/shotPlanner.js';
+import { sequenceShots, ShotSequence } from '../shots/shotSequencer.js';
+import { planTransitions, TransitionPlan } from '../shots/transitionPlanner.js';
+import { analyzePacing, PacingAnalysis } from '../shots/pacingPlanner.js';
 
 export interface VerticalSliceFilm {
   id: string;
   title: string;
   prompt: string;
   narrativeArc: NarrativeArc;
-  emotionalProgression: any[];
-  cinematicEscalation: any;
-  shotPlan: any[];
-  shotSequence: any;
-  transitions: any[];
-  pacingAnalysis: any;
+  emotionalProgression: EmotionalTransition[];
+  cinematicEscalation: EscalationProfile;
+  shotPlan: PlannedShot[];
+  shotSequence: ShotSequence;
+  transitions: TransitionPlan[];
+  pacingAnalysis: PacingAnalysis;
   metadata: FilmMetadata;
   createdAt: number;
   status: 'generating' | 'planned' | 'rendering' | 'complete' | 'error';
@@ -41,6 +41,7 @@ export interface GenerationProgress {
   progress: number; // 0-1
   currentOperation: string;
   estimatedTimeRemaining: number; // seconds
+  startTime: number;
 }
 
 export class VerticalSliceOrchestrator {
@@ -56,11 +57,55 @@ export class VerticalSliceOrchestrator {
       prompt,
       narrativeArc: {} as NarrativeArc,
       emotionalProgression: [],
-      cinematicEscalation: {},
+      cinematicEscalation: {
+        overallShape: 'linear',
+        peakTime: 0.5,
+        peakIntensity: 0.7,
+        resolutionSlope: 0.3
+      },
       shotPlan: [],
-      shotSequence: {},
+      shotSequence: {
+        id: 'initial',
+        shots: [],
+        totalDurationSeconds: 0,
+        emotionalArc: [],
+        pacingProfile: {
+          tempo: 'medium',
+          shotDurationMean: 5,
+          shotDurationStdDev: 2,
+          transitionRatio: 0.1,
+          silenceRatio: 0.2
+        },
+        continuityRules: []
+      },
       transitions: [],
-      pacingAnalysis: {},
+      pacingAnalysis: {
+        overallTempo: 'medium',
+        shotDurationProfile: {
+          mean: 5,
+          median: 5,
+          stdDev: 2,
+          min: 2,
+          max: 10,
+          distribution: 'normal'
+        },
+        emotionalRhythm: {
+          beatFrequency: 0.5,
+          intensityVariation: 0.3,
+          transitionSmoothness: 0.8,
+          peakAlignment: 0.7
+        },
+        silenceDistribution: {
+          totalSilenceSeconds: 10,
+          silenceRatio: 0.2,
+          longestSilence: 5,
+          distribution: 'dispersed',
+          effectiveness: 0.6
+        },
+        tensionCurve: [],
+        pacingIssues: [],
+        recommendations: []
+      },
       metadata: {
         durationSeconds: 0,
         shotCount: 0,
@@ -79,19 +124,20 @@ export class VerticalSliceOrchestrator {
       stage: 'narrative',
       progress: 0,
       currentOperation: 'Generating narrative arc...',
-      estimatedTimeRemaining: 30
+      estimatedTimeRemaining: 30,
+      startTime: Date.now()
     };
     
     try {
       // 1. Generate narrative arc
       this.updateProgress(0.1, 'narrative', 'Generating narrative arc...');
       const narrativeArc = generateNarrativeArc(prompt);
-      this.currentFilm.narrativeArc = narrativeArc;
+      if (this.currentFilm) this.currentFilm.narrativeArc = narrativeArc;
       
       // 2. Generate emotional progression
       this.updateProgress(0.2, 'emotional', 'Generating emotional progression...');
       const emotionalProgression = generateEmotionalProgression(narrativeArc.emotionalProgression);
-      this.currentFilm.emotionalProgression = emotionalProgression;
+      if (this.currentFilm) this.currentFilm.emotionalProgression = emotionalProgression;
       
       // 3. Analyze cinematic escalation
       this.updateProgress(0.3, 'escalation', 'Analyzing cinematic escalation...');
@@ -99,7 +145,7 @@ export class VerticalSliceOrchestrator {
         narrativeArc.emotionalProgression,
         narrativeArc.shotSequence
       );
-      this.currentFilm.cinematicEscalation = cinematicEscalation;
+      if (this.currentFilm) this.currentFilm.cinematicEscalation = cinematicEscalation;
       
       // 4. Plan shots
       this.updateProgress(0.5, 'shot_planning', 'Planning shots...');
@@ -107,7 +153,7 @@ export class VerticalSliceOrchestrator {
         narrativeArc.emotionalProgression,
         narrativeArc.shotSequence
       );
-      this.currentFilm.shotPlan = shotPlan;
+      if (this.currentFilm) this.currentFilm.shotPlan = shotPlan;
       
       // 5. Sequence shots
       this.updateProgress(0.6, 'sequencing', 'Sequencing shots...');
@@ -115,12 +161,12 @@ export class VerticalSliceOrchestrator {
         shotPlan,
         narrativeArc.emotionalProgression
       );
-      this.currentFilm.shotSequence = shotSequence;
+      if (this.currentFilm) this.currentFilm.shotSequence = shotSequence;
       
       // 6. Plan transitions
       this.updateProgress(0.8, 'transitions', 'Planning transitions...');
       const transitions = planTransitions(shotSequence.shots);
-      this.currentFilm.transitions = transitions;
+      if (this.currentFilm) this.currentFilm.transitions = transitions;
       
       // 7. Analyze pacing
       this.updateProgress(0.9, 'pacing', 'Analyzing pacing...');
@@ -129,7 +175,7 @@ export class VerticalSliceOrchestrator {
         transitions,
         narrativeArc.emotionalProgression
       );
-      this.currentFilm.pacingAnalysis = pacingAnalysis;
+      if (this.currentFilm) this.currentFilm.pacingAnalysis = pacingAnalysis;
       
       // 8. Update metadata
       this.updateProgress(0.95, 'complete', 'Finalizing film metadata...');
@@ -137,12 +183,12 @@ export class VerticalSliceOrchestrator {
       
       // 9. Complete
       this.updateProgress(1, 'complete', 'Film generation complete!');
-      this.currentFilm.status = 'planned';
+      if (this.currentFilm) this.currentFilm.status = 'planned';
       
-      return this.currentFilm;
+      return this.currentFilm || this.createDefaultFilm();
       
     } catch (error) {
-      this.currentFilm.status = 'error';
+      if (this.currentFilm) this.currentFilm.status = 'error';
       this.generationProgress = null;
       throw error;
     }
@@ -232,7 +278,7 @@ export class VerticalSliceOrchestrator {
       
       // Update estimated time remaining
       if (progress > 0) {
-        const elapsed = Date.now() - (this.generationProgress as any).startTime;
+        const elapsed = Date.now() - this.generationProgress.startTime;
         const estimatedTotal = elapsed / progress;
         this.generationProgress.estimatedTimeRemaining = (estimatedTotal - elapsed) / 1000;
       }
@@ -296,7 +342,7 @@ Emotional Arc: ${film.metadata.emotionalArc.join(' → ')}
     
     report.push(`=== SHOT SEQUENCE ===`);
     if (film.shotSequence.shots) {
-      film.shotSequence.shots.forEach((shot: any, i: number) => {
+      film.shotSequence.shots.forEach((shot, i: number) => {
         report.push(`${i + 1}. ${shot.shotType} (${shot.durationSeconds}s): ${shot.emotionalIntent} - ${shot.cameraSpecs.movement} camera`);
       });
     }
@@ -316,6 +362,77 @@ Emotional Arc: ${film.metadata.emotionalArc.join(' → ')}
     return report.join('\n');
   }
   
+  private createDefaultFilm(): VerticalSliceFilm {
+    return {
+      id: `film_${Date.now()}`,
+      title: 'Default Film',
+      prompt: '',
+      narrativeArc: {} as NarrativeArc,
+      emotionalProgression: [],
+      cinematicEscalation: {
+        overallShape: 'linear',
+        peakTime: 0.5,
+        peakIntensity: 0.7,
+        resolutionSlope: 0.3
+      },
+      shotPlan: [],
+      shotSequence: {
+        id: 'default',
+        shots: [],
+        totalDurationSeconds: 0,
+        emotionalArc: [],
+        pacingProfile: {
+          tempo: 'medium',
+          shotDurationMean: 5,
+          shotDurationStdDev: 2,
+          transitionRatio: 0.1,
+          silenceRatio: 0.2
+        },
+        continuityRules: []
+      },
+      transitions: [],
+      pacingAnalysis: {
+        overallTempo: 'medium',
+        shotDurationProfile: {
+          mean: 5,
+          median: 5,
+          stdDev: 2,
+          min: 2,
+          max: 10,
+          distribution: 'normal'
+        },
+        emotionalRhythm: {
+          beatFrequency: 0.5,
+          intensityVariation: 0.3,
+          transitionSmoothness: 0.8,
+          peakAlignment: 0.7
+        },
+        silenceDistribution: {
+          totalSilenceSeconds: 10,
+          silenceRatio: 0.2,
+          longestSilence: 5,
+          distribution: 'dispersed',
+          effectiveness: 0.6
+        },
+        tensionCurve: [],
+        pacingIssues: [],
+        recommendations: []
+      },
+      metadata: {
+        durationSeconds: 0,
+        shotCount: 0,
+        emotionalBeats: 0,
+        transitionCount: 0,
+        pacingTempo: 'medium',
+        emotionalArc: [],
+        cinematicIntensity: 0.5,
+        coherenceScore: 0.5
+      },
+      createdAt: Date.now(),
+      status: 'error'
+    };
+  }
+
   public reset(): void {
     this.currentFilm = null;
     this.generationProgress = null;
@@ -330,7 +447,7 @@ Emotional Arc: ${film.metadata.emotionalArc.join(' → ')}
     const issues: string[] = [];
     
     // Check duration consistency
-    const totalShotTime = film.shotPlan.reduce((sum: number, shot: any) => sum + shot.durationSeconds, 0);
+    const totalShotTime = film.shotPlan.reduce((sum: number, shot) => sum + shot.durationSeconds, 0);
     const durationDiff = Math.abs(totalShotTime - film.narrativeArc.durationSeconds);
     
     if (durationDiff > 2) {
@@ -348,7 +465,7 @@ Emotional Arc: ${film.metadata.emotionalArc.join(' → ')}
     
     // Check pacing issues
     if (film.pacingAnalysis.pacingIssues && film.pacingAnalysis.pacingIssues.length > 0) {
-      const highSeverity = film.pacingAnalysis.pacingIssues.filter((issue: any) => issue.severity === 'high');
+      const highSeverity = film.pacingAnalysis.pacingIssues.filter((issue) => issue.severity === 'high');
       if (highSeverity.length > 0) {
         issues.push(`${highSeverity.length} high-severity pacing issues detected`);
       }

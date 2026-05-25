@@ -4,6 +4,7 @@
 import { SequencedShot } from '../../../server/src/shots/shotSequencer';
 import { TransitionPlan } from '../../../server/src/shots/transitionPlanner';
 import { EmotionalBeat } from '../../../server/src/narrative/narrativeArcGenerator';
+import { AtmosphereProfile } from '../../../shared/src/scene';
 
 export interface TimelineState {
   currentTimeSeconds: number;
@@ -38,7 +39,7 @@ export type TimelineEvent =
   | { timeSeconds: number; type: 'transition_start'; data: { transition: TransitionPlan; index: number } }
   | { timeSeconds: number; type: 'transition_end'; data: { transition: TransitionPlan; index: number } }
   | { timeSeconds: number; type: 'emotional_beat'; data: { beat: EmotionalBeat; index: number } }
-  | { timeSeconds: number; type: 'atmosphere_change'; data: Record<string, unknown> };
+  | { timeSeconds: number; type: 'atmosphere_change'; data: { atmosphere: AtmosphereProfile } };
 
 export class CinematicTimeline {
   private shots: SequencedShot[];
@@ -457,5 +458,10 @@ Current Shot: ${currentShot ? `${currentShot.shotType} (${currentShot.sequencePo
 Current Transition: ${currentTransition ? currentTransition.type : 'None'}
 Emotion: ${this.state.emotionalState.primaryEmotion} (${(this.state.emotionalState.intensity * 100).toFixed(0)}%)
   `.trim();
+  }
+
+
+  public getShots(): SequencedShot[] {
+    return this.shots;
   }
 }

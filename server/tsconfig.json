@@ -6,7 +6,8 @@
     "moduleResolution": "NodeNext",
     "outDir": "dist",
     "types": ["node"],
-    "noEmit": true,
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
     "baseUrl": "..",
     "paths": {
       "@animaster/shared/*": ["shared/src/*"],

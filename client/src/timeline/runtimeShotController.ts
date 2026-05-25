@@ -4,7 +4,7 @@
 import { SequencedShot } from '../../../server/src/shots/shotSequencer';
 import { TransitionPlan } from '../../../server/src/shots/transitionPlanner';
 import { CinematicTimeline } from './cinematicTimeline';
-import { BeatScheduler, CameraAdjustment, LightingAdjustment, ActorAdjustment } from './beatScheduler';
+import { BeatScheduler } from './beatScheduler';
 
 export interface ShotRuntimeState {
   shot: SequencedShot;
@@ -36,7 +36,7 @@ export interface CameraPosition {
 }
 
 export interface CameraMovement {
-  type: 'static' | 'pan' | 'tilt' | 'tracking' | 'push_in' | 'pull_back';
+  type: 'static' | 'pan' | 'tilt' | 'tracking' | 'push_in' | 'pull_back' | 'handheld';
   speed: number; // 0-1
   target: CameraPosition | null;
 }
@@ -77,6 +77,24 @@ export interface ActorMovement {
   speed: number; // 0-1
   target: { x: number; y: number } | null;
 }
+
+export type CameraAdjustment =
+  | { type: 'push_in'; intensity: number; duration: number }
+  | { type: 'pull_back'; intensity: number; duration: number }
+  | { type: 'reframe'; intensity: number; duration: number }
+  | { type: 'hold'; intensity: number; duration: number }
+  | { type: 'drift'; intensity: number; duration: number };
+
+export type LightingAdjustment =
+  | { type: 'intensity_change'; value: number }
+  | { type: 'color_shift' }
+  | { type: 'contrast_boost' };
+
+export type ActorAdjustment =
+  | { type: 'posture_change'; value: string; duration: number }
+  | { type: 'gaze_shift'; value: string; duration: number }
+  | { type: 'movement_pause'; value: string; duration: number }
+  | { type: 'emotional_shift'; value: string; duration: number };
 
 export class RuntimeShotController {
   private timeline: CinematicTimeline;
@@ -439,9 +457,8 @@ export class RuntimeShotController {
   }
   
   private getShotById(shotId: string): SequencedShot | null {
-    return this.timeline.getShotAtTime(
-      this.timeline.getState().currentTimeSeconds
-    ) ?? null;
+    const shots = this.timeline.getShots();
+    return shots.find((s: SequencedShot) => s.id === shotId) || null;
   }
   
   private applyBeatInfluences(): void {
@@ -487,6 +504,7 @@ export class RuntimeShotController {
         this.currentShotState.cinematicParameters.cameraPosition.y += Math.sin(Date.now() * 0.001) * adjustment.intensity * 0.05;
         break;
       case 'hold':
+        // Hold means no movement - maintain current position
         break;
     }
   }

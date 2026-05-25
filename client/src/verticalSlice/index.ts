@@ -74,8 +74,21 @@ export function getShotTypeIcon(shotType: string): string {
   return iconMap[shotType] || '🎬';
 }
 
+export interface VerticalSliceConfig {
+  title: string;
+  duration: number;
+  shotCount: number;
+  emotionalBeats: number;
+  resolution?: { width: number; height: number };
+  frameRate?: number;
+  outputFormats?: readonly string[];
+  emotionalArc?: readonly string[];
+  shotTypes?: readonly string[];
+  transitionTypes?: readonly string[];
+}
+
 // Vertical Slice validation
-export function validateVerticalSliceConfig(config: any): { valid: boolean; errors: string[] } {
+export function validateVerticalSliceConfig(config: VerticalSliceConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
   if (!config.title || config.title.trim() === '') {

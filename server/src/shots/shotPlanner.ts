@@ -2,7 +2,7 @@
 // Phase 10: Vertical Slice
 
 import { EmotionalBeat, ShotSegment } from '../narrative/narrativeArcGenerator.js';
-import { CinematicShot, ShotType } from '../../../shared/src/cinematicShots.js';
+import { CinematicShot, ShotType } from '../types/sharedTypes.js';
 
 export interface PlannedShot {
   id: string;
@@ -37,6 +37,12 @@ export interface TransitionSpecs {
   durationSeconds: number;
   emotionalEffect: string;
   timing: 'precise' | 'overlap' | 'gap';
+}
+
+export interface EmotionalContext {
+  emotion: string;
+  intensity: number;
+  description: string;
 }
 
 export function planShotsFromArc(
@@ -116,7 +122,7 @@ function mapShotType(shotType: string): ShotType {
   return typeMap[shotType] || 'medium';
 }
 
-function getNarrativePurpose(segment: ShotSegment, context: { emotion: string; intensity: number; description: string }): string {
+function getNarrativePurpose(segment: ShotSegment, context: EmotionalContext): string {
   const purposes: Record<string, string> = {
     'establishing': `Establish ${context.emotion} atmosphere in empty station`,
     'wide': `Emphasize character isolation through negative space`,
@@ -129,7 +135,7 @@ function getNarrativePurpose(segment: ShotSegment, context: { emotion: string; i
   return purposes[segment.shotType] || `Convey ${context.emotion} through ${segment.shotType} shot`;
 }
 
-function generateCameraSpecs(segment: ShotSegment, context: { emotion: string; intensity: number; description: string }): CameraSpecs {
+function generateCameraSpecs(segment: ShotSegment, context: EmotionalContext): CameraSpecs {
   const specs: CameraSpecs = {
     angle: 'eye_level',
     movement: 'static',
@@ -178,7 +184,7 @@ function generateCameraSpecs(segment: ShotSegment, context: { emotion: string; i
   return specs;
 }
 
-function generateFramingSpecs(segment: ShotSegment, context: { emotion: string; intensity: number; description: string }): FramingSpecs {
+function generateFramingSpecs(segment: ShotSegment, context: EmotionalContext): FramingSpecs {
   const specs: FramingSpecs = {
     composition: 'rule_of_thirds',
     focalPriority: ['character'],

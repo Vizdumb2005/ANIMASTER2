@@ -8,7 +8,35 @@ type TabType = 'story' | 'timeline' | 'camera' | 'atmosphere' | 'curve' | 'memor
 export default function DirectorWorkspace() {
   const [scene, setScene] = useState<SceneGraph>(sceneStore.getScene());
   const [activeTab, setActiveTab] = useState<TabType>('timeline');
-  const [memoryData, setMemoryData] = useState<any>(null);
+  const [memoryData, setMemoryData] = useState<{
+    entries: Array<{
+      id: string;
+      prompt: string;
+      timestamp: number;
+      tone: string;
+      environment: string;
+      actorCount: number;
+      emotionalPeak: number;
+      effects: string[];
+      keyMoments: string[];
+    }>;
+    emotionalState: {
+      dominantEmotion: string;
+      emotionalHistory: Array<{ emotion: string; intensity: number; timestamp: number }>;
+      sustainedTensionMs: number;
+      lastPeakIntensity: number;
+      cumulativeEmotionalWeight: number;
+    };
+    continuityState: {
+      environmentHistory: string[];
+      toneHistory: string[];
+      effectHistory: string[];
+      relationshipEvolution: Array<{ actorAId: string; actorBId: string; typeHistory: string[] }>;
+      unresolvedTensions: string[];
+      activeMotifs: string[];
+    };
+    recentHistory: Array<Record<string, unknown>>;
+  } | null>(null);
   const [loadingMemory, setLoadingMemory] = useState(false);
 
   // Subscribe to scene changes
@@ -541,7 +569,7 @@ export default function DirectorWorkspace() {
                   <div className="memory-tracker-details">
                     <p><strong>180-Degree Alignment Check:</strong> Active. Character directions tracked relative to screen side.</p>
                     <div className="continuity-actors-mapping">
-                      {Object.entries(scene.narrativeState?.continuityTracker ?? {}).map(([id, info]: any) => (
+                      {Object.entries(scene.narrativeState?.continuityTracker ?? {}).map(([id, info]) => (
                         <div key={id} className="actor-continuity-row">
                           <span>Actor #{id}</span>
                           <span>Initial X: {info.initialX}px</span>
@@ -555,7 +583,7 @@ export default function DirectorWorkspace() {
                 <div className="memory-section">
                   <h4>Narrative Milestones (Session Logs)</h4>
                   <ul className="memory-log-list">
-                    {memoryData.entries?.map((entry: any, i: number) => (
+                    {memoryData.entries?.map((entry, i: number) => (
                       <li key={entry.id || i} className="memory-log-item">
                         <span className="log-time">{new Date(entry.timestamp).toLocaleTimeString()}</span>
                         <span className="log-prompt">"{entry.prompt}"</span>

@@ -2,6 +2,7 @@
 // Phase 10: "The Last Train"
 
 import { VerticalSliceOrchestrator } from './verticalSliceOrchestrator.js';
+import { PlannedShot } from '../shots/shotPlanner.js';
 
 async function testVerticalSlice() {
   console.log('=== Testing Vertical Slice System ===');
