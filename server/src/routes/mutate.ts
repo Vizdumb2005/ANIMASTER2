@@ -130,7 +130,7 @@ router.post('/', async (request, response) => {
   }
 });
 
-async function mutateScene(prompt: string, currentScene: unknown, directing?: DirectingContext): Promise<Partial<ScenePatch>> {
+export async function mutateScene(prompt: string, currentScene: unknown, directing?: DirectingContext): Promise<Partial<ScenePatch>> {
   const scene = currentScene as ScenePatch;
   const orchestration = await orchestrator.orchestrateMutation(prompt, buildOrchestrationScene(scene));
   const context = buildMutationContext(directing, orchestration);
@@ -725,17 +725,65 @@ function createFallbackPatch(prompt: string, currentScene: ScenePatch): Partial<
   return patch;
 }
 
-function normalizePatch(patch: ScenePatch, currentScene: ScenePatch): ScenePatch {
+const VALID_EMOTIONS = ['neutral', 'sad', 'happy', 'nervous', 'excited', 'awkward', 'angry', 'exhausted'];
+
+export function normalizePatch(patch: ScenePatch, currentScene: ScenePatch): ScenePatch {
+  const actors = Array.isArray(patch.actors) && patch.actors.length > 0
+    ? [...patch.actors]
+    : (Array.isArray(currentScene.actors) && currentScene.actors.length > 0 ? [...currentScene.actors] : []);
+
+  if (actors.length === 0) {
+    actors.push({
+      id: 'actor_stickman',
+      label: 'Stickman',
+      type: 'humanoid',
+      position: { x: 400, y: 360 },
+      targetPosition: null,
+      emotionState: 'neutral',
+      currentAction: 'idle',
+      actionQueue: ['idle'],
+      joints: {
+        head: { x: 400, y: 302 },
+        torso: { x: 400, y: 330 },
+        leftArm: { x: 372, y: 350 },
+        rightArm: { x: 428, y: 350 },
+        leftLeg: { x: 382, y: 402 },
+        rightLeg: { x: 418, y: 402 }
+      },
+      actionElapsed: 0
+    });
+  }
+
+  const sanitizedActors = actors.map((a: any) => {
+    const emotionState = VALID_EMOTIONS.includes(a?.emotionState) ? a.emotionState : 'neutral';
+    return {
+      ...a,
+      emotionState
+    };
+  });
+
+  const defaultEnv = {
+    type: 'indoor_room',
+    backgroundColor: '#17151f',
+    floorColor: '#2d221f',
+    wallColor: '#211c29',
+    width: 960,
+    height: 540
+  };
+
+  const defaultCamera = { x: 0, y: 0, zoom: 1, mode: 'static' };
+  const defaultAtmosphere = { effects: ['none'], lightingTint: 'rgba(0,0,0,0)', ambientIntensity: 1.0 };
+  const defaultRhythm = { tempo: 'medium', pauseFrequencyPerMinute: 4, motionEnergyCurve: 'linear' };
+  const defaultGrammar = { tone: 'neutral', template: { cameraMode: 'static', spacingMultiplier: 1.0, motionEnergyScale: 1.0, headroom: 1.0, pauseFrequency: 4, contrastBoost: 0 } };
+
   return {
-    actors: Array.isArray(patch.actors) && patch.actors.length > 0
-      ? patch.actors
-      : (Array.isArray(currentScene.actors) ? currentScene.actors : []),
-    environment: patch.environment ?? currentScene.environment,
-    camera: patch.camera ?? currentScene.camera,
-    cinematicGrammar: patch.cinematicGrammar ?? currentScene.cinematicGrammar,
-    atmosphere: patch.atmosphere ?? currentScene.atmosphere,
-    relationships: Array.isArray(patch.relationships) ? patch.relationships : currentScene.relationships,
-    rhythm: patch.rhythm ?? currentScene.rhythm,
+    actors: sanitizedActors,
+    environment: patch.environment ?? currentScene.environment ?? defaultEnv,
+    camera: patch.camera ?? currentScene.camera ?? defaultCamera,
+    cinematicGrammar: patch.cinematicGrammar ?? currentScene.cinematicGrammar ?? defaultGrammar,
+    atmosphere: patch.atmosphere ?? currentScene.atmosphere ?? defaultAtmosphere,
+    relationships: Array.isArray(patch.relationships) ? patch.relationships : (Array.isArray(currentScene.relationships) ? currentScene.relationships : []),
+    rhythm: patch.rhythm ?? currentScene.rhythm ?? defaultRhythm,
     semanticOperations: Array.isArray(patch.semanticOperations) ? patch.semanticOperations : []
   };
 }
