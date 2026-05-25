@@ -12,5 +12,8 @@
   },
   "dependencies": {
     "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.60.4"
   }
 }
