@@ -11,7 +11,8 @@
     "dev": "npm run dev -w client & npm run dev -w server"
   },
   "dependencies": {
-    "ws": "^8.20.1"
+    "ws": "^8.20.1",
+    "yaml": "^2.4.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
