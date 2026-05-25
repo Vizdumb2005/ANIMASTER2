@@ -139,50 +139,94 @@ router.post('/', async (request, response) => {
   }
 });
 
-async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<SceneGraphResponse> {
-  const orchestration = await orchestrator.orchestrateSceneGeneration(prompt);
-  const context = buildGenerationContext(directing, orchestration);
-  const provider = resolveProvider(orchestration.providerUsed);
+export async function interpretPrompt(prompt: string, directing?: DirectingContext): Promise<SceneGraphResponse> {
+  const truncatedPrompt = typeof prompt === 'string' ? prompt.trim().substring(0, 2000) : '';
 
-  if (!provider || provider.name === 'mock') {
-    const fallback = createFallbackScene(prompt);
-    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
+  try {
+    let orchestration;
+    try {
+      orchestration = await orchestrator.orchestrateSceneGeneration(truncatedPrompt);
+    } catch (err) {
+      console.error('Orchestration failed, using fallback:', err);
+      orchestration = {
+        scenePlan: {},
+        agentReports: {
+          cinematography: { cameraMode: 'static', framing: 'medium', transition: 'cut', reasoning: 'fallback' },
+          environment: { locationType: 'indoor_room', compositionBias: 'balanced', reasoning: 'fallback' },
+          emotionalArc: { pacing: 'medium', intensityCurve: 'flat', reasoning: 'fallback' },
+          blocking: { style: 'static', spacing: 200, reasoning: 'fallback' },
+          dialogue: { energy: 0.5, speed: 'normal', reasoning: 'fallback' },
+          lighting: { lightingLanguage: 'natural', keyColor: '#ffffff', ambientIntensity: 0.5, reasoning: 'fallback' }
+        },
+        intent: { emotionalPressure: 0.5, tensionLevel: 0.5, threatLevel: 0.5, intimacyLevel: 0.5, compositionStyle: 'balanced', lightingLanguage: 'natural', pacingStyle: 'measured', cameraAggression: 0.5, dialogueEnergy: 0.5, visualIsolation: 0.5, pacingStyleDurationMultiplier: 1.0 },
+        context: null,
+        providerUsed: 'fallback',
+        fallbackUsed: true,
+        reasoning: ['orchestration threw exception']
+      };
+    }
+
+    const context = buildGenerationContext(directing, orchestration as any);
+    const provider = resolveProvider(orchestration.providerUsed);
+
+    if (!provider || provider.name === 'mock') {
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return applyDirectorIntentToScene(fallback, directing?.directorIntent);
+    }
+
+    let completionResult;
+    try {
+      completionResult = await provider.complete({
+        messages: [
+          { role: 'system', content: sceneGenerationSystemPrompt },
+          { role: 'user', content: buildSceneGenerationUserPrompt(truncatedPrompt, context) }
+        ],
+        temperature: 0.2,
+        maxTokens: 2000,
+        responseFormat: 'json',
+        jsonSchema: sceneGenerationResponseSchema
+      });
+    } catch (err) {
+      console.error('LLM complete call threw exception, falling back:', err);
+      completionResult = { ok: false, error: err instanceof Error ? err : new Error(String(err)) } as any;
+    }
+
+    if (isErr(completionResult)) {
+      console.error('Scene generation failed, using fallback', completionResult.error);
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return fallback;
+    }
+
+    const completion = completionResult.value;
+    if (!completion.content || !completion.content.trim()) {
+      console.error('Provider response was empty');
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return fallback;
+    }
+
+    let parsed: SceneGraphResponse;
+    try {
+      parsed = JSON.parse(completion.content) as SceneGraphResponse;
+    } catch (parseErr) {
+      console.error('JSON parse of completion content failed, using fallback:', parseErr);
+      const fallback = createFallbackScene(truncatedPrompt);
+      fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, orchestration.scenePlan);
+      return fallback;
+    }
+
+    const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
+    const worldPlan = resolveWorldPlan(truncatedPrompt, actorCount, orchestration.scenePlan);
+    const normalized = normalizeSceneGraph(parsed, truncatedPrompt, worldPlan);
+    return applyDirectorIntentToScene(normalized, directing?.directorIntent);
+  } catch (globalError) {
+    console.error('Fatal error in interpretPrompt, returning fallback scene:', globalError);
+    const fallback = createFallbackScene(truncatedPrompt);
+    fallback.worldPlan = resolveWorldPlan(truncatedPrompt, fallback.actors.length, {});
     return applyDirectorIntentToScene(fallback, directing?.directorIntent);
   }
-
-  let parsed: SceneGraphResponse;
-  const completionResult = await provider.complete({
-    messages: [
-      { role: 'system', content: sceneGenerationSystemPrompt },
-      { role: 'user', content: buildSceneGenerationUserPrompt(prompt, context) }
-    ],
-    temperature: 0.2,
-    maxTokens: 2000,
-    responseFormat: 'json',
-    jsonSchema: sceneGenerationResponseSchema
-  });
-
-  if (isErr(completionResult)) {
-    console.error('Scene generation failed, using fallback', completionResult.error);
-    const fallback = createFallbackScene(prompt);
-    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
-    return fallback;
-  }
-
-  const completion = completionResult.value;
-  if (!completion.content || !completion.content.trim()) {
-    console.error('Provider response was empty');
-    const fallback = createFallbackScene(prompt);
-    fallback.worldPlan = resolveWorldPlan(prompt, fallback.actors.length, orchestration.scenePlan);
-    return fallback;
-  }
-
-  parsed = JSON.parse(completion.content) as SceneGraphResponse;
-
-  const actorCount = Array.isArray(parsed.actors) ? parsed.actors.length : 1;
-  const worldPlan = resolveWorldPlan(prompt, actorCount, orchestration.scenePlan);
-  const normalized = normalizeSceneGraph(parsed, prompt, worldPlan);
-  return applyDirectorIntentToScene(normalized, directing?.directorIntent);
 }
 
 type SceneOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateSceneGeneration>>;
