@@ -36,16 +36,212 @@ type MutationPatch = {
 };
 
 /**
+ * Generate a mutation patch based on the prompt using simple rules
+ * This is a fallback when no AI provider is available
+ */
+function generateFallbackMutation(prompt: string, currentScene: FullScene): MutationPatch {
+  const patch: MutationPatch = {
+    semanticOperations: []
+  };
+  const operations: any[] = [];
+
+  const lowerPrompt = prompt.toLowerCase();
+
+  // Lighting/fog/atmosphere changes
+  if (lowerPrompt.includes('fog')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      effects: ['fog'],
+      lightingTint: currentScene.atmosphere?.lightingTint || '#888888'
+    };
+    operations.push({ type: 'atmosphere', reason: 'Added fog effect' });
+  }
+  if (lowerPrompt.includes('remove fog') || lowerPrompt.includes('clear')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      effects: []
+    };
+    operations.push({ type: 'atmosphere', reason: 'Removed fog effect' });
+  }
+  if (lowerPrompt.includes('rain')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      effects: [...(currentScene.atmosphere?.effects || []), 'rain']
+    };
+    operations.push({ type: 'atmosphere', reason: 'Added rain effect' });
+  }
+  if (lowerPrompt.includes('snow')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      effects: [...(currentScene.atmosphere?.effects || []), 'snow']
+    };
+    operations.push({ type: 'atmosphere', reason: 'Added snow effect' });
+  }
+  if (lowerPrompt.includes('dust')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      effects: [...(currentScene.atmosphere?.effects || []), 'dust']
+    };
+    operations.push({ type: 'atmosphere', reason: 'Added dust effect' });
+  }
+
+  // Lighting changes
+  if (lowerPrompt.includes('darker') || lowerPrompt.includes('dark')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      ambientIntensity: (currentScene.atmosphere?.ambientIntensity || 0.5) * 0.7
+    };
+    operations.push({ type: 'lighting', reason: 'Reduced ambient intensity' });
+  }
+  if (lowerPrompt.includes('brighter') || lowerPrompt.includes('bright')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      ambientIntensity: Math.min(1, (currentScene.atmosphere?.ambientIntensity || 0.5) * 1.3)
+    };
+    operations.push({ type: 'lighting', reason: 'Increased ambient intensity' });
+  }
+  if (lowerPrompt.includes('colder') || lowerPrompt.includes('cold')) {
+    patch.atmosphere = {
+      ...currentScene.atmosphere,
+      lightingTint: '#aaccff'
+    };
+    operations.push({ type: 'lighting', reason: 'Made lighting colder' });
+  }
+
+  // Camera changes
+  if (lowerPrompt.includes('closer') || lowerPrompt.includes('push camera')) {
+    patch.camera = {
+      ...currentScene.camera,
+      zoom: (currentScene.camera?.zoom || 1) * 1.2
+    };
+    operations.push({ type: 'camera', reason: 'Pushed camera closer' });
+  }
+  if (lowerPrompt.includes('back') || lowerPrompt.includes('pull camera')) {
+    patch.camera = {
+      ...currentScene.camera,
+      zoom: (currentScene.camera?.zoom || 1) * 0.8
+    };
+    operations.push({ type: 'camera', reason: 'Pulled camera back' });
+  }
+
+  // Actor emotion changes
+  if (currentScene.actors && currentScene.actors.length > 0) {
+    const updatedActors = [...currentScene.actors];
+    let actorsModified = false;
+
+    for (let i = 0; i < updatedActors.length; i++) {
+      const actor = { ...updatedActors[i] };
+      let modified = false;
+
+      if (lowerPrompt.includes('lonely') && i === 0) {
+        actor.emotionState = 'sad';
+        actor.emotionIntensity = 0.7;
+        modified = true;
+        operations.push({ type: 'emotion', reason: `Made ${actor.label} feel lonely/sad` });
+      }
+      if (lowerPrompt.includes('nervous')) {
+        actor.emotionState = 'nervous';
+        actor.emotionIntensity = 0.8;
+        modified = true;
+        operations.push({ type: 'emotion', reason: `Made ${actor.label} nervous` });
+      }
+      if (lowerPrompt.includes('sad')) {
+        actor.emotionState = 'sad';
+        actor.emotionIntensity = 0.8;
+        modified = true;
+        operations.push({ type: 'emotion', reason: `Made ${actor.label} sad` });
+      }
+      if (lowerPrompt.includes('happy')) {
+        actor.emotionState = 'happy';
+        actor.emotionIntensity = 0.9;
+        modified = true;
+        operations.push({ type: 'emotion', reason: `Made ${actor.label} happy` });
+      }
+      if (lowerPrompt.includes('angry')) {
+        actor.emotionState = 'angry';
+        actor.emotionIntensity = 0.7;
+        modified = true;
+        operations.push({ type: 'emotion', reason: `Made ${actor.label} angry` });
+      }
+      if (lowerPrompt.includes('tense') || lowerPrompt.includes('threatening')) {
+        actor.emotionState = 'nervous';
+        actor.emotionIntensity = 0.6;
+        modified = true;
+        operations.push({ type: 'emotion', reason: `Made ${actor.label} tense` });
+      }
+      if (lowerPrompt.includes('walk')) {
+        actor.currentAction = 'walking';
+        modified = true;
+        operations.push({ type: 'action', reason: `Made ${actor.label} walk` });
+      }
+
+      if (modified) {
+        updatedActors[i] = actor;
+        actorsModified = true;
+      }
+    }
+
+    if (actorsModified) {
+      patch.actors = updatedActors;
+    }
+  }
+
+  // Add actor
+  if (lowerPrompt.includes('add a second character') || lowerPrompt.includes('add second character')) {
+    const newActor = {
+      id: `actor_${Date.now()}`,
+      label: 'New Character',
+      type: 'humanoid' as const,
+      position: { x: 200, y: 300 },
+      targetPosition: null,
+      emotionState: 'neutral' as const,
+      currentAction: 'idle' as const,
+      actionQueue: [],
+      joints: {
+        head: { x: 200, y: 250 },
+        torso: { x: 200, y: 300 },
+        leftArm: { x: 170, y: 290 },
+        rightArm: { x: 230, y: 290 },
+        leftLeg: { x: 185, y: 350 },
+        rightLeg: { x: 215, y: 350 }
+      },
+      actionElapsed: 0
+    };
+    patch.actors = [...(currentScene.actors || []), newActor];
+    operations.push({ type: 'actor', reason: 'Added second character' });
+  }
+
+  // Cinematic grammar changes
+  if (lowerPrompt.includes('romantic')) {
+    patch.cinematicGrammar = {
+      ...currentScene.cinematicGrammar,
+      tone: 'romantic'
+    };
+    operations.push({ type: 'cinematic', reason: 'Set romantic tone' });
+  }
+  if (lowerPrompt.includes('energetic')) {
+    patch.rhythm = {
+      ...currentScene.rhythm,
+      tempo: 'fast'
+    };
+    operations.push({ type: 'rhythm', reason: 'Set energetic rhythm' });
+  }
+
+  patch.semanticOperations = operations;
+  return patch;
+}
+
+/**
  * Call mutateScene to get a patch for an edit
  */
 async function getMutationPatch(prompt: string, currentScene: FullScene): Promise<MutationPatch> {
   const provider = providerRegistry.getBestAvailableProvider();
-  
+
   if (!provider || provider.name === 'mock') {
     // Fallback to regex-based mutation
-    return {};
+    return generateFallbackMutation(prompt, currentScene);
   }
-  
+
   try {
     const completionResult = await provider.complete({
       messages: [
@@ -57,15 +253,15 @@ async function getMutationPatch(prompt: string, currentScene: FullScene): Promis
       responseFormat: 'json',
       jsonSchema: sceneMutationResponseSchema
     });
-    
+
     if (isOk(completionResult) && completionResult.value.content) {
       return JSON.parse(completionResult.value.content) as MutationPatch;
     }
   } catch (error) {
     console.error('Mutation failed:', error);
   }
-  
-  return {};
+
+  return generateFallbackMutation(prompt, currentScene);
 }
 
 /**

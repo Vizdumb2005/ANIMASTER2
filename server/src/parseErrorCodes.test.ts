@@ -311,7 +311,7 @@ rhythm:
       );
       expect(undefinedRefError).toBeDefined();
       expect(undefinedRefError?.code).toBe('UNDEFINED_REFERENCE');
-      expect(undefinedRefError?.message).toContain('not found');
+      expect(undefinedRefError?.message).toContain('not defined');
     }
   });
 
