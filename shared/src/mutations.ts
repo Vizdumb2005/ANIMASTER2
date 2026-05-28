@@ -3,6 +3,10 @@
  *
  * Immutable mutation utilities for SceneGraph.
  * All functions return new graphs without mutating inputs.
+ *
+ * IMPORTANT: This is the SINGLE SOURCE OF TRUTH for mutation logic.
+ * Both server (routes/mutate.ts) and client (store/sceneStore.ts) MUST
+ * use applyMutation() from this module. No custom deep-merge elsewhere.
  */
 
 import type {
@@ -114,6 +118,92 @@ export interface RestageSceneMutation {
 }
 
 /**
+ * UpdateEnvironment - Merges partial changes into the scene's environment.
+ * This covers changes to backgroundColor, floorColor, wallColor, width/height, and type.
+ */
+export interface UpdateEnvironmentMutation {
+  type: 'UpdateEnvironment';
+  environment: Partial<Environment>;
+  reason?: string;
+}
+
+/**
+ * UpdateCamera - Merges partial changes into the scene's camera.
+ * This covers position, zoom, mode, shot, and plan changes.
+ */
+export interface UpdateCameraMutation {
+  type: 'UpdateCamera';
+  camera: Partial<Camera>;
+  reason?: string;
+}
+
+/**
+ * UpdateCinematicGrammar - Merges partial changes into the cinematic grammar.
+ * This covers tone and template changes.
+ */
+export interface UpdateCinematicGrammarMutation {
+  type: 'UpdateCinematicGrammar';
+  cinematicGrammar: Partial<CinematicGrammar>;
+  reason?: string;
+}
+
+/**
+ * UpdateAtmosphere - Merges partial changes into the atmosphere profile.
+ * This covers effects, lightingTint, and ambientIntensity changes.
+ */
+export interface UpdateAtmosphereMutation {
+  type: 'UpdateAtmosphere';
+  atmosphere: Partial<AtmosphereProfile>;
+  reason?: string;
+}
+
+/**
+ * SetRelationships - Wholesale replaces the relationships array.
+ */
+export interface SetRelationshipsMutation {
+  type: 'SetRelationships';
+  relationships: CharacterRelationship[];
+  reason?: string;
+}
+
+/**
+ * UpdateRhythm - Merges partial changes into the scene rhythm.
+ */
+export interface UpdateRhythmMutation {
+  type: 'UpdateRhythm';
+  rhythm: Partial<SceneRhythm>;
+  reason?: string;
+}
+
+/**
+ * UpdateActor - Merges partial changes into a specific actor.
+ */
+export interface UpdateActorMutation {
+  type: 'UpdateActor';
+  actorId: string;
+  patch: Partial<Actor>;
+  reason?: string;
+}
+
+/**
+ * AddActor - Adds a new actor to the scene.
+ */
+export interface AddActorMutation {
+  type: 'AddActor';
+  actor: Actor;
+  reason?: string;
+}
+
+/**
+ * RemoveActor - Removes an actor from the scene.
+ */
+export interface RemoveActorMutation {
+  type: 'RemoveActor';
+  actorId: string;
+  reason?: string;
+}
+
+/**
  * Discriminated union of all mutation operation types.
  * Use this for type-safe mutation handling.
  */
@@ -125,7 +215,16 @@ export type SceneGraphMutation =
   | FocusCameraOnMutation
   | MoveActorToAnchorMutation
   | AdjustRelationshipMutation
-  | RestageSceneMutation;
+  | RestageSceneMutation
+  | UpdateEnvironmentMutation
+  | UpdateCameraMutation
+  | UpdateCinematicGrammarMutation
+  | UpdateAtmosphereMutation
+  | SetRelationshipsMutation
+  | UpdateRhythmMutation
+  | UpdateActorMutation
+  | AddActorMutation
+  | RemoveActorMutation;
 
 /**
  * Apply a mutation to a SceneGraph and return a new SceneGraph.
@@ -260,6 +359,90 @@ export function applyMutation(
         };
       }
 
+    case 'UpdateEnvironment':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        environment: {
+          ...graph.environment,
+          ...mutation.environment,
+        },
+      };
+
+    case 'UpdateCamera':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        camera: {
+          ...graph.camera,
+          ...mutation.camera,
+        },
+      };
+
+    case 'UpdateCinematicGrammar':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        cinematicGrammar: {
+          ...graph.cinematicGrammar,
+          ...mutation.cinematicGrammar,
+        },
+      };
+
+    case 'UpdateAtmosphere':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        atmosphere: {
+          ...graph.atmosphere,
+          ...mutation.atmosphere,
+        },
+      };
+
+    case 'SetRelationships':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        relationships: mutation.relationships,
+      };
+
+    case 'UpdateRhythm':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        rhythm: {
+          ...graph.rhythm,
+          ...mutation.rhythm,
+        },
+      };
+
+    case 'UpdateActor': {
+      const updatedActors = graph.actors.map(actor =>
+        actor.id === mutation.actorId
+          ? { ...actor, ...mutation.patch }
+          : actor
+      );
+      return {
+        ...graph,
+        version: graph.version + 1,
+        actors: updatedActors,
+      };
+    }
+
+    case 'AddActor':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        actors: [...graph.actors, mutation.actor],
+      };
+
+    case 'RemoveActor':
+      return {
+        ...graph,
+        version: graph.version + 1,
+        actors: graph.actors.filter(actor => actor.id !== mutation.actorId),
+      };
+
     default:
       // Fallback for any unknown mutation types
       return {
@@ -273,7 +456,8 @@ export function applyMutation(
  * Create a mutation from a partial scene specification.
  * This is a convenience function for creating mutations.
  * 
- * @param changes - Partial scene with changes
+ * @param type - The mutation type
+ * @param params - The mutation parameters (excluding 'type')
  * @returns A SceneGraphMutation
  */
 export function createMutation(

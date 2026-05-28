@@ -1,3 +1,13 @@
+/**
+ * server/src/routes/mutate.ts
+ *
+ * Scene mutation API route.
+ *
+ * IMPORTANT: This module uses applyMutation() from shared/src/mutations.js
+ * for all mutation operations. This ensures single source of truth for
+ * mutation logic and prevents drift between client and server implementations.
+ */
+
 import { Router } from 'express';
 import { providerRegistry } from '../ai/providers/providerRegistry.js';
 import { orchestrator } from '../ai/runtime/orchestrator.js';
@@ -9,6 +19,8 @@ import {
   sceneMutationResponseSchema,
   sceneMutationSystemPrompt
 } from '../prompts/sceneMutationPrompt.js';
+import { applyMutation, type SceneGraphMutation } from '../../../shared/src/mutations.js';
+import type { SceneGraph } from '../../../shared/src/scene.js';
 
 type MutateRequestBody = {
   prompt: string;
@@ -172,6 +184,25 @@ async function mutateScene(prompt: string, currentScene: unknown, directing?: Di
   const normalized = normalizePatch(parsed, scene);
   const directedPatch = applyDirectorIntentToPatch(normalized, scene, directing?.directorIntent);
   return applyActorOverrides(directedPatch, scene, directing?.actorOverrides);
+}
+
+/**
+ * Apply mutations to a SceneGraph using the shared applyMutation function.
+ * This ensures single source of truth for mutation logic.
+ *
+ * @param sceneGraph - The base SceneGraph to mutate
+ * @param mutations - Array of mutations to apply
+ * @returns The mutated SceneGraph with version incremented
+ */
+export function applyMutationsToScene(
+  sceneGraph: SceneGraph,
+  mutations: SceneGraphMutation[]
+): SceneGraph {
+  // Use the shared applyMutation for single source of truth
+  return mutations.reduce(
+    (current, mutation) => applyMutation(current, mutation),
+    sceneGraph
+  );
 }
 
 type MutationOrchestration = Awaited<ReturnType<typeof orchestrator.orchestrateMutation>>;

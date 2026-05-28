@@ -34,6 +34,17 @@ import type {
   AtmosphereEffect,
   RelationshipType,
 } from '../../../shared/src/scene.js';
+import type {
+  SceneGraphMutation,
+  SetToneMutation,
+  SetActorEmotionMutation,
+  AddAtmosphereMutation,
+  QueueActorActionMutation,
+  FocusCameraOnMutation,
+  MoveActorToAnchorMutation,
+  AdjustRelationshipMutation,
+  RestageSceneMutation,
+} from '../../../shared/src/mutations.js';
 
 // ---------------------------------------------------------------------------
 // Primitive arbitraries
@@ -263,5 +274,163 @@ export function arbitrarySceneGraph(): fc.Arbitrary<SceneGraph> {
       ...base,
       relationships: rels as CharacterRelationship[],
     }));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Mutation arbitraries
+// ---------------------------------------------------------------------------
+
+const ACTION_TYPES_ARR = ['idle', 'waiting', 'walkingTo', 'approaching', 'sittingDown', 'seated', 'lookingAt', 'hesitating', 'pacing'] as const;
+
+const FRAMING_INTENTS_ARR = ['isolate', 'follow', 'observe', 'compress', 'reveal', 'confront'] as const;
+
+/**
+ * Generates an arbitrary SceneGraphMutation that is valid for the given SceneGraph.
+ *
+ * The mutation will reference valid actors, anchors, and relationships from the scene,
+ * ensuring the mutation can be successfully applied.
+ *
+ * @param sceneGraph - The SceneGraph to generate valid mutations for
+ * @returns An arbitrary that produces valid SceneGraphMutations
+ */
+export function arbitrarySceneGraphMutation(
+  sceneGraph: SceneGraph
+): fc.Arbitrary<SceneGraphMutation> {
+  const hasActors = sceneGraph.actors.length > 0;
+  const hasAnchors = sceneGraph.anchors && sceneGraph.anchors.length > 0;
+
+  const mutations: fc.Arbitrary<SceneGraphMutation>[] = [];
+
+  // SetTone - always valid
+  mutations.push(
+    fc.record<SetToneMutation>({
+      type: fc.constant('SetTone'),
+      tone: enumOf(SCENE_TONES_ARR),
+      reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+    })
+  );
+
+  // AddAtmosphere - always valid
+  mutations.push(
+    fc.record<AddAtmosphereMutation>({
+      type: fc.constant('AddAtmosphere'),
+      effect: enumOf(ATMOSPHERE_EFFECTS_ARR),
+      reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+    })
+  );
+
+  // RestageScene - always valid
+  mutations.push(
+    fc.record<RestageSceneMutation>({
+      type: fc.constant('RestageScene'),
+      strategy: fc.constantFrom('preserve_actions', 'tone_composition'),
+      reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+    })
+  );
+
+  // Actor-dependent mutations
+  if (hasActors) {
+    const actorIds = sceneGraph.actors.map(a => a.id);
+    const targetActorId = fc.constantFrom(...actorIds);
+
+    // SetActorEmotion
+    mutations.push(
+      fc.record<SetActorEmotionMutation>({
+        type: fc.constant('SetActorEmotion'),
+        actorId: targetActorId,
+        emotion: enumOf(ACTOR_EMOTIONS_ARR),
+        intensity: fc.option(safeFloat(0, 1), { nil: undefined }),
+        reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+      })
+    );
+
+    // QueueActorAction
+    mutations.push(
+      fc.record<QueueActorActionMutation>({
+        type: fc.constant('QueueActorAction'),
+        actorId: targetActorId,
+        action: fc.constantFrom(...ACTION_TYPES_ARR),
+        reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+      })
+    );
+
+    // FocusCameraOn
+    mutations.push(
+      fc.tuple(
+        fc.array(targetActorId, { minLength: 1, maxLength: 3 }),
+        fc.constantFrom(...FRAMING_INTENTS_ARR)
+      ).map(([subjectIds, framingIntent]): FocusCameraOnMutation => ({
+        type: 'FocusCameraOn',
+        subjectIds,
+        framingIntent,
+        reason: fc.sample(fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }), 1)[0],
+      }))
+    );
+
+    // MoveActorToAnchor (requires anchors)
+    if (hasAnchors) {
+      const anchorIds = sceneGraph.anchors!.map(a => a.id);
+      mutations.push(
+        fc.record<MoveActorToAnchorMutation>({
+          type: fc.constant('MoveActorToAnchor'),
+          actorId: targetActorId,
+          anchorId: fc.constantFrom(...anchorIds),
+          reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+        })
+      );
+    }
+
+    // AdjustRelationship (requires at least 2 actors for meaningful relationships)
+    if (actorIds.length >= 2) {
+      mutations.push(
+        fc.tuple(targetActorId, targetActorId).chain(([aId, bId]): fc.Arbitrary<AdjustRelationshipMutation> => {
+          return fc.record<AdjustRelationshipMutation>({
+            type: fc.constant('AdjustRelationship'),
+            actorAId: fc.constant(aId),
+            actorBId: fc.constant(bId),
+            patch: fc.record({
+              type: fc.option(enumOf(RELATIONSHIP_TYPES_ARR), { nil: undefined }),
+              awarenessRadius: fc.option(posInt(0, 500), { nil: undefined }),
+              gazeTarget: fc.option(
+                fc.oneof(
+                  { arbitrary: fc.constant(null), weight: 1 },
+                  { arbitrary: fc.constantFrom(...actorIds), weight: 1 }
+                ),
+                { nil: undefined }
+              ),
+              emotionalReaction: fc.option(
+                fc.oneof(
+                  { arbitrary: fc.constant(null), weight: 1 },
+                  { arbitrary: enumOf(ACTOR_EMOTIONS_ARR), weight: 1 }
+                ),
+                { nil: undefined }
+              ),
+            }),
+            reason: fc.option(fc.stringMatching(/^[a-z_]{5,20}$/), { nil: undefined }),
+          });
+        })
+      );
+    }
+  }
+
+  return fc.oneof(...mutations);
+}
+
+/**
+ * Generates an array of SceneGraphMutations that are all valid for the given SceneGraph.
+ *
+ * @param sceneGraph - The SceneGraph to generate valid mutations for
+ * @param count - Number of mutations to generate (default: random 1-10)
+ * @returns An arbitrary that produces arrays of valid SceneGraphMutations
+ */
+export function arbitrarySceneGraphMutationSequence(
+  sceneGraph: SceneGraph,
+  count?: number
+): fc.Arbitrary<SceneGraphMutation[]> {
+  const length = count ?? fc.sample(fc.integer({ min: 1, max: 10 }), 1)[0];
+  return fc.array(arbitrarySceneGraphMutation(sceneGraph), {
+    minLength: length,
+    maxLength: length,
   });
 }

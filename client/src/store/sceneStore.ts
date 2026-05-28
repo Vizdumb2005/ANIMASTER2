@@ -1,4 +1,8 @@
 import { Actor, ActorEmotion, AtmosphereProfile, BeatSequence, Camera, CinematicGrammar, Environment, SceneGraph, SceneRhythm, SessionEntry, SemanticMutationOperation } from '@animaster/shared/scene';
+import {
+  applyMutations,
+  type SceneGraphMutation,
+} from '@animaster/shared/mutations';
 import { initActorJoints } from '../runtime/initActorJoints';
 import { resetSceneEvaluator } from '../runtime/sceneEvaluator';
 import { createDefaultAnchors } from '../runtime/semanticAnchors';
@@ -112,34 +116,6 @@ function createDefaultScene(): SceneGraph {
     rhythm,
     continuity: { lastValidatedVersion: 0, actorSnapshots: {}, cameraSnapshot: null, violations: [] }
   };
-}
-
-function deepMerge<T>(target: T, source: Partial<T>): T {
-  const result = { ...target } as Record<string, unknown>;
-  const src = source as Record<string, unknown>;
-  const tgt = target as Record<string, unknown>;
-  for (const key of Object.keys(src)) {
-    const sourceVal = src[key];
-    const targetVal = tgt[key];
-    if (
-      sourceVal !== null &&
-      sourceVal !== undefined &&
-      typeof sourceVal === 'object' &&
-      !Array.isArray(sourceVal) &&
-      targetVal !== null &&
-      targetVal !== undefined &&
-      typeof targetVal === 'object' &&
-      !Array.isArray(targetVal)
-    ) {
-      result[key] = deepMerge(
-        targetVal as Record<string, unknown>,
-        sourceVal as Record<string, unknown>
-      );
-    } else if (sourceVal !== undefined) {
-      result[key] = sourceVal;
-    }
-  }
-  return result as T;
 }
 
 // ---- Scene Series ----
@@ -274,50 +250,84 @@ export const sceneStore = {
     const draft = cloneScene(currentScene);
     ensureSemanticRuntimeState(draft);
 
+    // Build an array of SceneGraphMutation objects from the patch
+    // using the shared applyMutation() as the single source of truth
+    const mutations: SceneGraphMutation[] = [];
+
     const operations = (patch as Partial<SceneGraph> & { semanticOperations?: SemanticMutationOperation[] }).semanticOperations;
     if (Array.isArray(operations) && operations.length > 0) {
       applySemanticOperations(draft, operations);
     }
 
     if (patch.environment) {
-      draft.environment = deepMerge(draft.environment, patch.environment);
-    }
-
-    if (patch.camera) {
-      draft.camera = deepMerge(draft.camera, patch.camera);
-    }
-
-    if (Array.isArray(patch.actors)) {
-      draft.actors = patch.actors.map((patchActor) => {
-        const existing = draft.actors.find((a) => a.id === patchActor.id);
-        if (existing) {
-          const merged = deepMerge(
-            existing as unknown as Record<string, unknown>,
-            patchActor as unknown as Record<string, unknown>
-          ) as unknown as Actor;
-          merged.joints = initActorJoints(merged.position);
-          return merged;
-        }
-        const newActor = { ...patchActor };
-        newActor.joints = initActorJoints(newActor.position);
-        return newActor;
+      mutations.push({
+        type: 'UpdateEnvironment',
+        environment: patch.environment,
       });
     }
 
+    if (patch.camera) {
+      mutations.push({
+        type: 'UpdateCamera',
+        camera: patch.camera,
+      });
+    }
+
+    if (Array.isArray(patch.actors)) {
+      const existingIds = new Set(draft.actors.map(a => a.id));
+      for (const patchActor of patch.actors) {
+        if (existingIds.has(patchActor.id)) {
+          // Update existing actor
+          mutations.push({
+            type: 'UpdateActor',
+            actorId: patchActor.id,
+            patch: patchActor,
+          });
+        } else {
+          // Add new actor
+          mutations.push({
+            type: 'AddActor',
+            actor: patchActor as Actor,
+          });
+        }
+      }
+    }
+
     if (patch.cinematicGrammar) {
-      draft.cinematicGrammar = deepMerge(draft.cinematicGrammar, patch.cinematicGrammar);
+      mutations.push({
+        type: 'UpdateCinematicGrammar',
+        cinematicGrammar: patch.cinematicGrammar,
+      });
     }
 
     if (patch.atmosphere) {
-      draft.atmosphere = deepMerge(draft.atmosphere, patch.atmosphere);
+      mutations.push({
+        type: 'UpdateAtmosphere',
+        atmosphere: patch.atmosphere,
+      });
     }
 
     if (Array.isArray(patch.relationships)) {
-      draft.relationships = patch.relationships;
+      mutations.push({
+        type: 'SetRelationships',
+        relationships: patch.relationships,
+      });
     }
 
     if (patch.rhythm) {
-      draft.rhythm = deepMerge(draft.rhythm, patch.rhythm);
+      mutations.push({
+        type: 'UpdateRhythm',
+        rhythm: patch.rhythm,
+      });
+    }
+
+    // Apply all mutations atomically using shared applyMutations()
+    if (mutations.length > 0) {
+      // We apply mutations to a plain clone first, then merge back into draft
+      // to preserve the runtime state references already set up
+      const result = applyMutations(draft, mutations);
+      // Copy all fields from result back to draft (draft is what we'll use)
+      Object.assign(draft, result);
     }
 
     const hasMeaningfulChanges = !!(
@@ -355,6 +365,14 @@ export const sceneStore = {
 
     cleanupActorOverrides(draft);
     applyActorOverrides(draft);
+
+    // Reinitialize joints for actors that may have been mutated
+    for (const actor of draft.actors) {
+      if (!actor.joints) {
+        actor.joints = initActorJoints(actor.position);
+      }
+    }
+
     ensureSemanticRuntimeState(draft);
     draft.version += 1;
     if (Array.isArray(operations) && operations.length > 0) {

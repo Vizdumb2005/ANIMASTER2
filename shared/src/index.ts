@@ -5,3 +5,5 @@ export * from './directorialStyles';
 export * from './specParser.js';
 export * from './specPrinter.js';
 export * from './specSchema.js';
+export * from './deepMerge.js';
+export * from './mutations.js';

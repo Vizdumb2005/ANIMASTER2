@@ -1,0 +1,6 @@
+# Cline Execution Rules
+
+- **NO DIRECT CODING / EDITING**: You are strictly prohibited from using your built-in file writing, file editing, or file creation tools (such as `write_to_file`, `replace_file_content`, or editing tools) to modify code files directly.
+- **COMMAND-ONLY EXECUTION**: You must perform all development tasks, file modifications, builds, and tests strictly by running terminal/bash commands or executing command-line utilities.
+- **MCP ORCHESTRATION**: Use the exposed `animaster-swarm` MCP tools to execute advanced processes (AST search, testing, profiling, debate) as needed.
+- **ROUTING ROLES**: Act strictly as an orchestrator that triggers command execution or local scripts, rather than writing code yourself.
